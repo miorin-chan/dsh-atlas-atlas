@@ -22,8 +22,7 @@
 ## 开发检查
 
 ```sh
-pnpm install --ignore-scripts
-npm run build
+pnpm install --frozen-lockfile
 npm run check
 ```
 
