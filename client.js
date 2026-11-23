@@ -368,6 +368,18 @@ var LABELS = {
   }
 };
 
+// src/client/published-icons.ts
+var ATLAS_ICONS = {
+  // "@miorin/dsh-atlas-workspace@0.1.0/icon.svg"
+  workspace: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2IiBmaWxsPSJub25lIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0id29ya3NwYWNlLWF0bGFzLWJvZHkiIHgxPSI1IiB5MT0iNCIgeDI9IjI1IiB5Mj0iMzAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzhGQTRGNiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0RTU2RDQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9IndvcmtzcGFjZS1hdGxhcy1jb21wYXNzIiB4MT0iMzMiIHkxPSIxOS41IiB4Mj0iMjAuNSIgeTI9IjMzLjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzhGRDNGRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0QjYyRTEiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bWFzayBpZD0id29ya3NwYWNlLWF0bGFzLWN1dCIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeD0iMCIgeT0iMCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2Ij4KICAgICAgPHJlY3Qgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2IiBmaWxsPSJ3aGl0ZSIvPgogICAgICA8cGF0aCBkPSJNMy41IDEzLjI1SDMwIiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjEuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgICAgIDxjaXJjbGUgY3g9IjI2LjUiIGN5PSIyNi41IiByPSI5LjI1IiBmaWxsPSJibGFjayIvPgogICAgPC9tYXNrPgogIDwvZGVmcz4KICA8ZyBmaWxsPSJ1cmwoI3dvcmtzcGFjZS1hdGxhcy1ib2R5KSIgbWFzaz0idXJsKCN3b3Jrc3BhY2UtYXRsYXMtY3V0KSI+CiAgICA8cGF0aCBkPSJNMy41IDkuNWEzIDMgMCAwIDEgMy0zaDYuNGwyLjggMi44SDI3YTMgMyAwIDAgMSAzIDNWMjVhMyAzIDAgMCAxLTMgM0g2LjVhMyAzIDAgMCAxLTMtM1oiLz4KICA8L2c+CiAgPGNpcmNsZSBjeD0iMjYuNSIgY3k9IjI2LjUiIHI9IjcuNSIgZmlsbD0idXJsKCN3b3Jrc3BhY2UtYXRsYXMtY29tcGFzcykiLz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iNS42IiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS1vcGFjaXR5PSIwLjIyIi8+CiAgPGcgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMjYuNSAyNi41KSI+CiAgICA8cGF0aCBkPSJNMjYuNSAyMC45bDEuNzUgNC4yLTEuNzUgMS40LTEuNzUtMS40WiIgZmlsbD0iI0ZGRkZGRiIvPgogICAgPHBhdGggZD0iTTI2LjUgMzIuMWwxLjc1LTQuMi0xLjc1LTEuNC0xLjc1IDEuNFoiIGZpbGw9IiNGRkZGRkYiIGZpbGwtb3BhY2l0eT0iMC40NSIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iMS4xIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=",
+  // "@miorin/dsh-atlas-session@0.1.0/icon.svg"
+  session: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2IiBmaWxsPSJub25lIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2Vzc2lvbi1hdGxhcy1ib2R5IiB4MT0iNSIgeTE9IjQiIHgyPSIyNSIgeTI9IjMwIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiM4RkE0RjYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNEU1NkQ0Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJzZXNzaW9uLWF0bGFzLWNvbXBhc3MiIHgxPSIzMyIgeTE9IjE5LjUiIHgyPSIyMC41IiB5Mj0iMzMuNSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBzdG9wLWNvbG9yPSIjOEZEM0ZGIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzRCNjJFMSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxtYXNrIGlkPSJzZXNzaW9uLWF0bGFzLWN1dCIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeD0iMCIgeT0iMCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2Ij4KICAgICAgPHJlY3Qgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2IiBmaWxsPSJ3aGl0ZSIvPgogICAgICA8cGF0aCBkPSJNMTAgMTEuNWgxMyIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIyLjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogICAgICA8cGF0aCBkPSJNMTAgMTYuNWg4IiBzdHJva2U9ImJsYWNrIiBzdHJva2Utd2lkdGg9IjIuMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgICAgIDxjaXJjbGUgY3g9IjI2LjUiIGN5PSIyNi41IiByPSI5LjI1IiBmaWxsPSJibGFjayIvPgogICAgPC9tYXNrPgogIDwvZGVmcz4KICA8ZyBmaWxsPSJ1cmwoI3Nlc3Npb24tYXRsYXMtYm9keSkiIG1hc2s9InVybCgjc2Vzc2lvbi1hdGxhcy1jdXQpIj4KICAgIDxwYXRoIGQ9Ik05IDQuNWgxNS41YTUgNSAwIDAgMSA1IDV2OWE1IDUgMCAwIDEtNSA1SDE0LjZsLTUuNCA0LjZjLS42LjUtMS41LjEtMS41LS43di00LjFBNSA1IDAgMCAxIDQgMTguNXYtOWE1IDUgMCAwIDEgNS01WiIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iNy41IiBmaWxsPSJ1cmwoI3Nlc3Npb24tYXRsYXMtY29tcGFzcykiLz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iNS42IiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS1vcGFjaXR5PSIwLjIyIi8+CiAgPGcgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMjYuNSAyNi41KSI+CiAgICA8cGF0aCBkPSJNMjYuNSAyMC45bDEuNzUgNC4yLTEuNzUgMS40LTEuNzUtMS40WiIgZmlsbD0iI0ZGRkZGRiIvPgogICAgPHBhdGggZD0iTTI2LjUgMzIuMWwxLjc1LTQuMi0xLjc1LTEuNC0xLjc1IDEuNFoiIGZpbGw9IiNGRkZGRkYiIGZpbGwtb3BhY2l0eT0iMC40NSIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iMS4xIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=",
+  // "@miorin/dsh-atlas-plugin@0.1.0/icon.svg"
+  plugin: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2IiBmaWxsPSJub25lIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icGx1Z2luLWF0bGFzLWJvZHkiIHgxPSI1IiB5MT0iNCIgeDI9IjI1IiB5Mj0iMzAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzhGQTRGNiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0RTU2RDQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InBsdWdpbi1hdGxhcy1jb21wYXNzIiB4MT0iMzMiIHkxPSIxOS41IiB4Mj0iMjAuNSIgeTI9IjMzLjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzhGRDNGRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0QjYyRTEiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bWFzayBpZD0icGx1Z2luLWF0bGFzLWN1dCIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeD0iMCIgeT0iMCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2Ij4KICAgICAgPHJlY3Qgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2IiBmaWxsPSJ3aGl0ZSIvPgogICAgICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iOS4yNSIgZmlsbD0iYmxhY2siLz4KICAgIDwvbWFzaz4KICA8L2RlZnM+CiAgPGcgZmlsbD0idXJsKCNwbHVnaW4tYXRsYXMtYm9keSkiIG1hc2s9InVybCgjcGx1Z2luLWF0bGFzLWN1dCkiPgogICAgPHBhdGggZD0iTTEwLjUgOS41aDQuOWEzLjQgMy40IDAgMSAxIDQuNyAwSDI1YTIgMiAwIDAgMSAyIDJWMjZhMiAyIDAgMCAxLTIgMkgxMC41YTIgMiAwIDAgMS0yLTJ2LTQuOWEzLjQgMy40IDAgMSAxIDAtNC43di00LjlhMiAyIDAgMCAxIDItMloiLz4KICA8L2c+CiAgPGNpcmNsZSBjeD0iMjYuNSIgY3k9IjI2LjUiIHI9IjcuNSIgZmlsbD0idXJsKCNwbHVnaW4tYXRsYXMtY29tcGFzcykiLz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iNS42IiBzdHJva2U9IiNGRkZGRkYiIHN0cm9rZS1vcGFjaXR5PSIwLjIyIi8+CiAgPGcgdHJhbnNmb3JtPSJyb3RhdGUoNDUgMjYuNSAyNi41KSI+CiAgICA8cGF0aCBkPSJNMjYuNSAyMC45bDEuNzUgNC4yLTEuNzUgMS40LTEuNzUtMS40WiIgZmlsbD0iI0ZGRkZGRiIvPgogICAgPHBhdGggZD0iTTI2LjUgMzIuMWwxLjc1LTQuMi0xLjc1LTEuNC0xLjc1IDEuNFoiIGZpbGw9IiNGRkZGRkYiIGZpbGwtb3BhY2l0eT0iMC40NSIvPgogIDwvZz4KICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iMS4xIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=",
+  // "@miorin/dsh-atlas-mobile@0.1.0/icon.svg"
+  mobile: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2IiBmaWxsPSJub25lIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibW9iaWxlLWF0bGFzLWJvZHkiIHgxPSI1IiB5MT0iNCIgeDI9IjI1IiB5Mj0iMzAiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzhGQTRGNiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0RTU2RDQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Im1vYmlsZS1hdGxhcy1jb21wYXNzIiB4MT0iMzMiIHkxPSIxOS41IiB4Mj0iMjAuNSIgeTI9IjMzLjUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzhGRDNGRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0QjYyRTEiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bWFzayBpZD0ibW9iaWxlLWF0bGFzLWN1dCIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeD0iMCIgeT0iMCIgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2Ij4KICAgICAgPHJlY3Qgd2lkdGg9IjM2IiBoZWlnaHQ9IjM2IiBmaWxsPSJ3aGl0ZSIvPgogICAgICA8Y2lyY2xlIGN4PSIyNi41IiBjeT0iMjYuNSIgcj0iOS4yNSIgZmlsbD0iYmxhY2siLz4KICAgIDwvbWFzaz4KICA8L2RlZnM+CiAgPGcgZmlsbD0idXJsKCNtb2JpbGUtYXRsYXMtYm9keSkiIG1hc2s9InVybCgjbW9iaWxlLWF0bGFzLWN1dCkiPgogICAgPHJlY3QgeD0iNy42MjUiIHk9IjQuMTI1IiB3aWR0aD0iMTQuNzUiIGhlaWdodD0iMjYuNzUiIHJ4PSIzLjQiIGZpbGwtb3BhY2l0eT0iLjE2IiBzdHJva2U9InVybCgjbW9iaWxlLWF0bGFzLWJvZHkpIiBzdHJva2Utd2lkdGg9IjIuMjUiLz4KICAgIDxyZWN0IHg9IjEyLjUiIHk9IjciIHdpZHRoPSI1IiBoZWlnaHQ9IjEuOCIgcng9Ii45Ii8+CiAgPC9nPgogIDxjaXJjbGUgY3g9IjI2LjUiIGN5PSIyNi41IiByPSI3LjUiIGZpbGw9InVybCgjbW9iaWxlLWF0bGFzLWNvbXBhc3MpIi8+CiAgPGNpcmNsZSBjeD0iMjYuNSIgY3k9IjI2LjUiIHI9IjUuNiIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utb3BhY2l0eT0iMC4yMiIvPgogIDxnIHRyYW5zZm9ybT0icm90YXRlKDQ1IDI2LjUgMjYuNSkiPgogICAgPHBhdGggZD0iTTI2LjUgMjAuOWwxLjc1IDQuMi0xLjc1IDEuNC0xLjc1LTEuNFoiIGZpbGw9IiNGRkZGRkYiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDMyLjFsMS43NS00LjItMS43NS0xLjQtMS43NSAxLjRaIiBmaWxsPSIjRkZGRkZGIiBmaWxsLW9wYWNpdHk9IjAuNDUiLz4KICA8L2c+CiAgPGNpcmNsZSBjeD0iMjYuNSIgY3k9IjI2LjUiIHI9IjEuMSIgZmlsbD0iI0ZGRkZGRiIvPgo8L3N2Zz4K"
+};
+
 // src/client/styles.ts
 var CSS = `
 .dsh-atlas-manager-heading {
@@ -384,16 +396,27 @@ var CSS = `
   display: grid;
 }
 .dsh-atlas-manager-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 .dsh-atlas-manager-row:last-child { border-bottom: 0; }
+.dsh-atlas-manager-icon {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  align-self: start;
+  width: 40px;
+  height: 40px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+}
+.dsh-atlas-manager-icon > img { object-fit: contain; }
 .dsh-atlas-manager-copy { min-width: 0; }
-.dsh-atlas-manager-label { font-size: 14px; line-height: 20px; font-weight: 500; }
+.dsh-atlas-manager-label { font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
 .dsh-atlas-manager-status {
   font-size: 13px;
   line-height: 18px;
@@ -416,10 +439,10 @@ var CSS = `
   cursor: pointer;
 }
 .dsh-atlas-manager-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px 36px;
   align-items: center;
   gap: 8px;
-  flex: none;
 }
 .dsh-atlas-manager-spinner {
   box-sizing: border-box;
@@ -433,7 +456,7 @@ var CSS = `
 @keyframes dsh-atlas-manager-spin { to { transform: rotate(1turn); } }
 .dsh-atlas-manager-switch {
   box-sizing: border-box;
-  flex: 0 0 auto;
+  grid-column: 2;
   width: 36px;
   height: 20px;
   padding: 2px;
@@ -573,6 +596,7 @@ function apply(ctx) {
         const status = stage ?? (bundle?.error !== void 0 ? "bundleError" : enabled ? "enabled" : needsInstall && !bundle?.installed ? "notInstalled" : "disabled");
         const statusId = `${listId}-${atlas}`;
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "dsh-atlas-manager-row", "data-atlas": atlas, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "dsh-atlas-manager-icon", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", { src: ATLAS_ICONS[atlas], width: 30, height: 30, alt: "" }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "dsh-atlas-manager-copy", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "dsh-atlas-manager-label", children: t(atlas) }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { id: statusId, role: "status", children: [

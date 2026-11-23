@@ -54,6 +54,8 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "sync:atlas-icons": "node scripts/sync-atlas-icons.mjs",
+    "prepack": "npm run sync:atlas-icons 1>&2 && npm run build 1>&2",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test",
     "check": "node --test && npm run typecheck && node scripts/build.mjs --check && node scripts/sync-types.mjs --check"

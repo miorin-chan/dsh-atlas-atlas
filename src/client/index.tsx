@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import { useEffect, useId, useSyncExternalStore } from 'react'
 import { ATLAS_BUNDLES, PACKAGE, setAtlasEnabled, type Atlas, type Notice, type Progress } from '../lib/atlas.js'
 import { LABELS } from './labels.js'
+import { ATLAS_ICONS } from './published-icons.js'
 import { CSS } from './styles.js'
 
 const NS = 'dsh-atlas-atlas'
@@ -144,6 +145,10 @@ export function apply(ctx: ClientContext): void {
             const statusId = `${listId}-${atlas}`
             return (
               <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
+                {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
+                <span className="dsh-atlas-manager-icon" aria-hidden="true">
+                  <img src={ATLAS_ICONS[atlas]} width={30} height={30} alt="" />
+                </span>
                 <div className="dsh-atlas-manager-copy">
                   <div className="dsh-atlas-manager-label">{t(atlas)}</div>
                   <div id={statusId} role="status">

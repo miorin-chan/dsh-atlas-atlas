@@ -15,16 +15,27 @@ export const CSS = `
   display: grid;
 }
 .dsh-atlas-manager-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 .dsh-atlas-manager-row:last-child { border-bottom: 0; }
+.dsh-atlas-manager-icon {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  align-self: start;
+  width: 40px;
+  height: 40px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+}
+.dsh-atlas-manager-icon > img { object-fit: contain; }
 .dsh-atlas-manager-copy { min-width: 0; }
-.dsh-atlas-manager-label { font-size: 14px; line-height: 20px; font-weight: 500; }
+.dsh-atlas-manager-label { font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
 .dsh-atlas-manager-status {
   font-size: 13px;
   line-height: 18px;
@@ -47,10 +58,10 @@ export const CSS = `
   cursor: pointer;
 }
 .dsh-atlas-manager-control {
-  display: flex;
+  display: grid;
+  grid-template-columns: 14px 36px;
   align-items: center;
   gap: 8px;
-  flex: none;
 }
 .dsh-atlas-manager-spinner {
   box-sizing: border-box;
@@ -64,7 +75,7 @@ export const CSS = `
 @keyframes dsh-atlas-manager-spin { to { transform: rotate(1turn); } }
 .dsh-atlas-manager-switch {
   box-sizing: border-box;
-  flex: 0 0 auto;
+  grid-column: 2;
   width: 36px;
   height: 20px;
   padding: 2px;
