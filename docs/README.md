@@ -19,7 +19,11 @@
 生成的 [图标清单](../src/client/published-icons.ts) 记录包名、版本和资源路径。
 日常构建和页面显示直接使用随插件保存的图标，成员尚未安装时也有图标。
 
-## 开发检查
+## 本地安装与开发检查
+
+在新检出的仓库中先运行下面的依赖安装命令，`prepare` 会构建插件。
+本地安装时，随后在 DSH 的 **插件 → 添加插件** 中选择该目录。
+开发检查按以下顺序执行。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -28,8 +32,7 @@ npm run check
 ```
 
 测试直接导入从 `src/lib/atlas.ts` 编译的 `lib/atlas.js`，Git 忽略这份产物。
-安装依赖和 `npm test` 都会执行构建。
-全新检出时先安装依赖，再运行读取现有产物的 `npm run check`。
+`npm test` 会先构建再运行测试。`npm run check` 读取现有产物并核对它们与源码是否一致。
 
 从工作区运行 `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-atlas-atlas`。
 测试覆盖 npm 首次安装、已有安装复用、包文件缺失、并行安装、行 ID 冲突、失败后的启用状态和插槽释放。
