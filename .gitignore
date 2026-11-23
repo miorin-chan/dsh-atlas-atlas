@@ -1,5 +1,6 @@
 node_modules/
 coverage/
+/lib/atlas.js
 *.tgz
 *.log
 .DS_Store

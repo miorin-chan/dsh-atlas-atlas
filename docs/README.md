@@ -23,8 +23,13 @@
 
 ```sh
 pnpm install --frozen-lockfile
+npm test
 npm run check
 ```
+
+测试直接导入从 `src/lib/atlas.ts` 编译的 `lib/atlas.js`，Git 忽略这份产物。
+安装依赖和 `npm test` 都会执行构建。
+全新检出时先安装依赖，再运行读取现有产物的 `npm run check`。
 
 从工作区运行 `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-atlas-atlas`。
 测试覆盖 npm 首次安装、已有安装复用、包文件缺失、并行安装、行 ID 冲突、失败后的启用状态和插槽释放。
