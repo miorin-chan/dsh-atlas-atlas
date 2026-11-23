@@ -34,7 +34,7 @@ npm run check
 测试直接导入从 `src/lib/atlas.ts` 编译的 `lib/atlas.js`，Git 忽略这份产物。
 `npm test` 会先构建再运行测试。`npm run check` 读取现有产物并核对它们与源码是否一致。
 
-从工作区运行 `node tools/new-dsh-plugin/cli.mjs --check plugins/dsh-atlas-atlas`。
+从工作区运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
 测试覆盖 npm 首次安装、已有安装复用、包文件缺失、并行安装、行 ID 冲突、失败后的启用状态和插槽释放。
 开关适配的官方代码版本和许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)。
 
