@@ -1,0 +1,78 @@
+{
+  "name": "@miorin/dsh-atlas-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Install the workspace, session, plugin, and mobile Atlas bundles from npm and toggle them from one card.",
+  "type": "module",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "atlas"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "THIRD-PARTY-NOTICES.md",
+    "AGENTS.md",
+    "AGENTS.local.md",
+    "docs/README.md",
+    "docs/DETAIL.*.md",
+    "README.zh.md",
+    "src",
+    "scripts",
+    "tsconfig.json"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test",
+    "check": "node --test && npm run typecheck && node scripts/build.mjs --check && node scripts/sync-types.mjs --check"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.1.0",
+    "@deepseek-ai/dsh-api-gateway": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-api-remote-access": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-api-remotes": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-connection": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-locale": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-plugin-manager": "0.2.2-rc.5",
+    "@types/node": "^22.20.5",
+    "@types/react": "18.3.31",
+    "esbuild": "0.28.2",
+    "react": "18.3.1",
+    "typescript": "5.7.3"
+  }
+}

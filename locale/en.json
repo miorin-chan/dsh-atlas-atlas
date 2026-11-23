@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Atlas manager",
+    "description": "Enable Atlas manager to install the four Atlas bundles from npm and toggle each one here.",
+    "detail": "docs/DETAIL.en.md"
+  }
+}

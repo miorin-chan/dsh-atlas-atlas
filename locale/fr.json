@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Gestionnaire Atlas",
+    "description": "Activez le Gestionnaire Atlas pour installer ici les quatre bundles Atlas depuis npm et les activer ou les désactiver séparément.",
+    "detail": "docs/DETAIL.fr.md"
+  }
+}

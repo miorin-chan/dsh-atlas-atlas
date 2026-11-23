@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Atlas マネージャー",
+    "description": "Atlas マネージャーを有効にすると、ここで 4 つの Atlas バンドルを npm からインストールし、個別に有効・無効を切り替えられます。",
+    "detail": "docs/DETAIL.ja.md"
+  }
+}

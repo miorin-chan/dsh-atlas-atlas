@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Atlas 管理",
+    "description": "启用 Atlas 管理后，可在此从 npm 安装四个 Atlas，并分别启停。",
+    "detail": "docs/DETAIL.zh.md"
+  }
+}

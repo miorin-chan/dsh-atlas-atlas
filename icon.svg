@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" fill="none">
+  <defs>
+    <linearGradient id="atlas-manager-body" x1="5" y1="4" x2="25" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8FA4F6"/>
+      <stop offset="1" stop-color="#4E56D4"/>
+    </linearGradient>
+    <linearGradient id="atlas-manager-compass" x1="33" y1="19.5" x2="20.5" y2="33.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8FD3FF"/>
+      <stop offset="1" stop-color="#4B62E1"/>
+    </linearGradient>
+    <mask id="atlas-manager-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="36" height="36">
+      <rect width="36" height="36" fill="white"/>
+      <circle cx="26.5" cy="26.5" r="9.25" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="url(#atlas-manager-body)" mask="url(#atlas-manager-cut)">
+    <rect x="5.5" y="5.5" width="9.5" height="9.5" rx="2.7"/>
+    <rect x="18" y="5.5" width="9.5" height="9.5" rx="2.7"/>
+    <rect x="5.5" y="18" width="9.5" height="9.5" rx="2.7"/>
+    <rect x="18" y="18" width="9.5" height="9.5" rx="2.7"/>
+  </g>
+  <circle cx="26.5" cy="26.5" r="7.5" fill="url(#atlas-manager-compass)"/>
+  <circle cx="26.5" cy="26.5" r="5.6" stroke="#FFFFFF" stroke-opacity="0.22"/>
+  <g transform="rotate(45 26.5 26.5)">
+    <path d="M26.5 20.9l1.75 4.2-1.75 1.4-1.75-1.4Z" fill="#FFFFFF"/>
+    <path d="M26.5 32.1l1.75-4.2-1.75-1.4-1.75 1.4Z" fill="#FFFFFF" fill-opacity="0.45"/>
+  </g>
+  <circle cx="26.5" cy="26.5" r="1.1" fill="#FFFFFF"/>
+</svg>

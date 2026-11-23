@@ -1,0 +1,13 @@
+# Atlas 管理
+
+[English](README.md)
+
+在 **插件 → 添加插件** 中选择本目录，再打开 **插件 → Atlas 管理**。
+四个开关分别管理当前 profile 的工作区、会话、插件和移动端 Atlas。
+管理器需要 DeepSeek Harness `0.2.2-rc.5` 或更新版本的 Web 或桌面界面。
+DSH 在安装时会核对各 Atlas 自己的版本要求。
+
+首次开启时从 npm 安装并启用对应 Atlas。
+关闭会停用整包并保留安装和逐项设置，再次开启直接复用已有安装。
+
+[开发与验证](docs/README.md)

@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Atlas-Verwaltung",
+    "description": "Aktivieren Sie die Atlas-Verwaltung, um hier die vier Atlas-Bundles von npm zu installieren und einzeln ein- oder auszuschalten.",
+    "detail": "docs/DETAIL.de.md"
+  }
+}

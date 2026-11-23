@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Gestor de Atlas",
+    "description": "Active el Gestor de Atlas para instalar aquí los cuatro paquetes de Atlas desde npm y activarlos o desactivarlos por separado.",
+    "detail": "docs/DETAIL.es.md"
+  }
+}
