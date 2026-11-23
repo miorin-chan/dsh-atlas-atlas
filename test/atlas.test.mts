@@ -31,6 +31,8 @@ function fixture(others = []) {
 const ignoreProgress = () => {}
 
 test('installs and enables each missing Atlas from the npm registry and reuses it on the next enable', async () => {
+  assert.deepEqual(Object.keys(ATLAS_BUNDLES), ['workspace', 'session', 'plugin', 'mobile', 'runtime'])
+  assert.equal(ATLAS_BUNDLES.runtime, '@miorin/dsh-atlas-runtime')
   const { manager, profile, writes } = fixture()
   for (const [atlas, name] of Object.entries(ATLAS_BUNDLES)) {
     const stages = []

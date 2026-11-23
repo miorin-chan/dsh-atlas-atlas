@@ -3,7 +3,7 @@
 [English](README.md)
 
 在 DeepSeek Harness 的 **插件 → 添加插件** 中输入 `@miorin/dsh-atlas-atlas`，再打开 **插件 → 模块模块化改良计划**。
-四个开关分别管理当前 profile 的工作区、会话、插件和移动端模块化改良计划。
+五个开关分别管理当前 profile 的工作区、会话、插件、移动端和运行时模块化改良计划。
 
 管理器需要 DeepSeek Harness `0.2.2-rc.5` 或更新版本的 Web 或桌面界面。
 DSH 在安装时会核对各成员包自己的版本要求。

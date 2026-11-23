@@ -49,9 +49,20 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
   assert.equal(typeof slot?.render, 'function')
   assert.deepEqual([...subscriptions].sort(), ['connection/reset', 'plugin-manager/changed'])
   const labels = locales.get('dsh-atlas-atlas')
-  assert.deepEqual(Object.keys(labels).sort(), ['de', 'en', 'es', 'fr', 'ja', 'pt', 'ru', 'zh'])
+  const runtimeTitles = {
+    en: 'Runtime Modular Improvement Plan',
+    zh: '运行时模块化改良计划',
+    ja: 'ランタイムのモジュール型改善計画',
+    de: 'Modularer Verbesserungsplan für die Laufzeit',
+    es: 'Plan de mejora modular del entorno de ejecución',
+    fr: 'Plan d’amélioration modulaire de l’environnement d’exécution',
+    pt: 'Plano de melhoria modular do ambiente de execução',
+    ru: 'План модульного улучшения среды выполнения',
+  }
+  assert.deepEqual(Object.keys(labels).sort(), Object.keys(runtimeTitles).sort())
   for (const [language, localized] of Object.entries(labels)) {
     assert.deepEqual(Object.keys(localized).sort(), Object.keys(labels.en).sort())
+    assert.equal(localized.runtime, runtimeTitles[language], language)
     const { meta } = JSON.parse(readFileSync(new URL(`../locale/${language}.json`, import.meta.url), 'utf8'))
     if (language === 'zh') {
       assert.equal(meta.title, '模块模块化改良计划')

@@ -6,6 +6,7 @@ export const ATLAS_BUNDLES = {
   session: '@miorin/dsh-atlas-session',
   plugin: '@miorin/dsh-atlas-plugin',
   mobile: '@miorin/dsh-atlas-mobile',
+  runtime: '@miorin/dsh-atlas-runtime',
 } as const
 
 export type Atlas = keyof typeof ATLAS_BUNDLES

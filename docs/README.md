@@ -1,16 +1,16 @@
 # 模块模块化改良计划开发与验证
 
-[使用说明](../README.zh.md)介绍管理卡的安装和四个开关。
+[使用说明](../README.zh.md)介绍管理卡的安装和五个开关。
 
 ## 命名与本地化
 
 中文管理器的正式名称为「模块模块化改良计划」。
 开头重复的「模块」是有意设计的叠词，维护中文文案时保留完整名称。
-其他语言采用各自的译名。四个开关在每种语言下都与对应成员包的 `meta.title` 一致。
+其他语言采用各自的译名。每个开关在对应语言下都与成员包的 `meta.title` 一致。
 
 ## 行为
 
-管理卡通过 `plugins.bundle.config` 插槽渲染四个开关。
+管理卡通过 `plugins.bundle.config` 插槽渲染五个开关。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
 
 首次开启时，管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，保存实际安装的精确版本。
@@ -20,8 +20,8 @@
 
 ## 成员图标
 
-四个开关行使用各成员包已发布到 npm 的图标。
-`npm pack` 在打包前执行 `npm run sync:atlas-icons`，从四个 `latest` 发布包读取图标，再构建客户端。
+开关行使用各成员包已发布到 npm 的图标。
+`npm pack` 在打包前执行 `npm run sync:atlas-icons`，从各成员包的 `latest` 版本读取图标，再构建客户端。
 生成的 [图标清单](../src/client/published-icons.ts) 记录包名、版本和资源路径。
 日常构建和页面显示直接使用随插件保存的图标，成员尚未安装时也有图标。
 
@@ -41,10 +41,11 @@ npm run check
 `npm test` 会先构建再运行测试。`npm run check` 读取现有产物并核对它们与源码是否一致。
 
 从工作区运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
-测试覆盖 npm 首次安装、已有安装复用、包文件缺失、并行安装、行 ID 冲突、失败后的启用状态和插槽释放。
+测试覆盖五个成员包的 npm 首次安装与已有安装复用，以及包文件缺失、并行安装、行 ID 冲突和启用失败后的状态。
+客户端测试核对插槽的注册和释放，以及运行时开关的八语标题。
 开关适配的官方代码版本和许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)。
 
-## 一次性 profile 实测
+## 一次性 profile 实测（0.1.0）
 
 2026-11-23，使用 DSH `0.2.2-rc.5` 与 Chrome 驱动。
 在一次性 `DSH_HOME` 安装管理插件的打包产物，模型引导使用回环夹具。

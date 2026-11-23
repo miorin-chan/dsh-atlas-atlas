@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "模块模块化改良计划",
-    "description": "启用后，可在此从 npm 安装四个模块化改良计划成员包，并分别启停。",
+    "description": "启用后，可在此从 npm 安装五个模块化改良计划成员包，并分别启停。",
     "detail": "docs/DETAIL.zh.md"
   }
 }

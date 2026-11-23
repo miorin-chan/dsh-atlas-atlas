@@ -15,7 +15,8 @@ Check whether new behavior belongs in its own bundle.
 - `README.md` is for users: installation, usage, commands, and limits.
   Provide `README.zh.md` as its Chinese version.
 - [docs/README.md](docs/README.md) records the package's behavior, build steps, and verification.
-- [src/lib/atlas.ts](src/lib/atlas.ts) declares the four npm bundle names and handles their install and selection.
+- [src/lib/atlas.ts](src/lib/atlas.ts) declares the member bundle names on npm and handles their installation
+  and selection.
 - Keep the plugin detail page short.
   Set `meta.title` and `meta.description` in `locale/*.json` for the DSH interface language.
   Use `meta.detail` in each locale to select a short, packaged Markdown document when needed.

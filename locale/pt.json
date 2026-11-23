@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Gerenciador do plano de melhoria modular",
-    "description": "Ative o gerenciador para instalar aqui os quatro bundles do plano de melhoria modular pelo npm e ativá-los ou desativá-los separadamente.",
+    "description": "Ative o gerenciador para instalar aqui os cinco bundles do plano de melhoria modular pelo npm e ativá-los ou desativá-los separadamente.",
     "detail": "docs/DETAIL.pt.md"
   }
 }

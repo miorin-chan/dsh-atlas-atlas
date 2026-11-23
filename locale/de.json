@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Verwaltung des modularen Verbesserungsplans",
-    "description": "Aktivieren Sie die Verwaltung, um hier die vier Bundles des modularen Verbesserungsplans über npm zu installieren und einzeln ein- oder auszuschalten.",
+    "description": "Aktivieren Sie die Verwaltung, um hier die fünf Bundles des modularen Verbesserungsplans über npm zu installieren und einzeln ein- oder auszuschalten.",
     "detail": "docs/DETAIL.de.md"
   }
 }
