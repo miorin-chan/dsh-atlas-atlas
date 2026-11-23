@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
 
@@ -49,8 +50,16 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
   assert.deepEqual([...subscriptions].sort(), ['connection/reset', 'plugin-manager/changed'])
   const labels = locales.get('dsh-atlas-atlas')
   assert.deepEqual(Object.keys(labels).sort(), ['de', 'en', 'es', 'fr', 'ja', 'pt', 'ru', 'zh'])
-  for (const localized of Object.values(labels)) {
+  for (const [language, localized] of Object.entries(labels)) {
     assert.deepEqual(Object.keys(localized).sort(), Object.keys(labels.en).sort())
+    const { meta } = JSON.parse(readFileSync(new URL(`../locale/${language}.json`, import.meta.url), 'utf8'))
+    if (language === 'zh') {
+      assert.equal(meta.title, '模块模块化改良计划')
+      continue
+    }
+    for (const text of [meta.title, meta.description, ...Object.values(localized)]) {
+      assert.doesNotMatch(text, /模块化改良计划/u, language)
+    }
   }
 
   for (const dispose of effects.reverse()) dispose()

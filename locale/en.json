@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "模块化改良计划 manager",
-    "description": "Enable 模块化改良计划 manager to install the four 模块化改良计划 bundles from npm and toggle each one here.",
+    "title": "Modular Improvement Plan Manager",
+    "description": "Enable the manager to install the four Modular Improvement Plan bundles from npm and turn each one on or off here.",
     "detail": "docs/DETAIL.en.md"
   }
 }

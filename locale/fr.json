@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Gestionnaire de 模块化改良计划",
-    "description": "Activez le Gestionnaire de 模块化改良计划 pour installer ici les quatre bundles de 模块化改良计划 depuis npm et les activer ou les désactiver séparément.",
+    "title": "Gestionnaire du plan d’amélioration modulaire",
+    "description": "Activez le gestionnaire pour installer ici les quatre bundles du plan d’amélioration modulaire depuis npm et les activer ou les désactiver séparément.",
     "detail": "docs/DETAIL.fr.md"
   }
 }
