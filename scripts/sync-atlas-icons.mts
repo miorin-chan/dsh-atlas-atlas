@@ -2,7 +2,16 @@ import { execFileSync } from 'node:child_process'
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, extname, join, posix } from 'node:path'
-import { ATLAS_BUNDLES } from '../src/lib/atlas.ts'
+const { ATLAS_BUNDLES } = await import(new URL('../src/lib/atlas.ts', import.meta.url).href) as {
+  ATLAS_BUNDLES: Readonly<Record<string, string>>
+}
+
+interface PackedPlugin {
+  name: string
+  filename: string
+  version: string
+  files: { path: string, size: number }[]
+}
 
 const MAX_ICON_BYTES = 256 * 1024
 const MIME_TYPES = new Map([
@@ -24,7 +33,7 @@ try {
     'pack', '--ignore-scripts', '--dry-run=false', '--json', '--registry=https://registry.npmjs.org/',
     '--pack-destination', directory, '--cache', join(directory, 'cache'),
     ...targets.map(([, name]) => `${name}@latest`),
-  ], { cwd: directory, encoding: 'utf8', timeout: 60000 }))
+  ], { cwd: directory, encoding: 'utf8', timeout: 60000 })) as PackedPlugin[]
 
   const entries = targets.map(([atlas, name]) => {
     const pack = packages.find(item => item.name === name)
@@ -32,10 +41,12 @@ try {
       throw new Error(`No npm archive for ${name}`)
     }
     const archive = join(directory, pack.filename)
-    const readMember = (path, maxBuffer) => execFileSync('tar', ['-xOf', archive, `package/${path}`], {
+    const readMember = (path: string, maxBuffer: number) => execFileSync('tar', ['-xOf', archive, `package/${path}`], {
       maxBuffer, timeout: 10000,
     })
-    const manifest = JSON.parse(readMember('package.json', MAX_ICON_BYTES))
+    const manifest = JSON.parse(readMember('package.json', MAX_ICON_BYTES).toString('utf8')) as {
+      name: string, version: string, icon?: unknown, exports?: Record<string, unknown>
+    }
     if (manifest.name !== name || manifest.version !== pack.version) throw new Error(`Unexpected manifest for ${name}`)
     const resource = manifest.icon ?? manifest.exports?.['./icon']
     const path = typeof resource === 'string' ? posix.normalize(resource) : ''
