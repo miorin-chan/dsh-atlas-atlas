@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Gerenciador do Atlas",
-    "description": "Ative o Gerenciador do Atlas para instalar aqui os quatro bundles do Atlas pelo npm e ativá-los ou desativá-los separadamente.",
+    "title": "Gerenciador do 模块化改良计划",
+    "description": "Ative o Gerenciador do 模块化改良计划 para instalar aqui os quatro bundles do 模块化改良计划 pelo npm e ativá-los ou desativá-los separadamente.",
     "detail": "docs/DETAIL.pt.md"
   }
 }

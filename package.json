@@ -1,9 +1,8 @@
 {
   "name": "@miorin/dsh-atlas-atlas",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
-  "description": "Install the workspace, session, plugin, and mobile Atlas bundles from npm and toggle them from one card.",
+  "description": "Install and manage the workspace, session, plugin, and mobile bundles of 模块化改良计划.",
   "type": "module",
   "keywords": [
     "deepseek-harness",
@@ -30,12 +29,17 @@
     "docs/README.md",
     "docs/DETAIL.*.md",
     "README.zh.md",
+    "CHANGELOG.md",
     "src",
     "scripts",
     "tsconfig.json"
   ],
   "engines": {
     "dsh": ">=0.2.2-rc.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "dsh": {
     "bundle": {

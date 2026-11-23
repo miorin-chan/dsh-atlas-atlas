@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Atlas manager",
-    "description": "Enable Atlas manager to install the four Atlas bundles from npm and toggle each one here.",
+    "title": "模块化改良计划 manager",
+    "description": "Enable 模块化改良计划 manager to install the four 模块化改良计划 bundles from npm and toggle each one here.",
     "detail": "docs/DETAIL.en.md"
   }
 }

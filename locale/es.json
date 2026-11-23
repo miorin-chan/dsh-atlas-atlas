@@ -1,7 +1,7 @@
 {
   "meta": {
-    "title": "Gestor de Atlas",
-    "description": "Active el Gestor de Atlas para instalar aquí los cuatro paquetes de Atlas desde npm y activarlos o desactivarlos por separado.",
+    "title": "Gestor de 模块化改良计划",
+    "description": "Active el Gestor de 模块化改良计划 para instalar aquí los cuatro paquetes de 模块化改良计划 desde npm y activarlos o desactivarlos por separado.",
     "detail": "docs/DETAIL.es.md"
   }
 }
