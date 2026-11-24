@@ -2,7 +2,7 @@
 
 [简体中文](README.zh.md)
 
-Manage the workspace, session, plugin, mobile, and runtime bundles for the current profile from one page.
+Manage the workspace, session, runtime, plugin, and mobile bundles for the current profile from one page.
 In DeepSeek Harness Web or Desktop, open **Plugins → Add plugin** and enter `@miorin/dsh-atlas-atlas`.
 Open **Plugins → Modular Improvement Plan Manager** to use the five switches.
 

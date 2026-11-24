@@ -4,9 +4,9 @@ export const PACKAGE = '@miorin/dsh-atlas-atlas'
 export const ATLAS_BUNDLES = {
   workspace: '@miorin/dsh-atlas-workspace',
   session: '@miorin/dsh-atlas-session',
+  runtime: '@miorin/dsh-atlas-runtime',
   plugin: '@miorin/dsh-atlas-plugin',
   mobile: '@miorin/dsh-atlas-mobile',
-  runtime: '@miorin/dsh-atlas-runtime',
 } as const
 
 export type Atlas = keyof typeof ATLAS_BUNDLES

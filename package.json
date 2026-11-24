@@ -2,7 +2,7 @@
   "name": "@miorin/dsh-atlas-atlas",
   "version": "0.2.0",
   "license": "MIT",
-  "description": "Install and manage the five Modular Improvement Plan bundles for workspaces, sessions, plugins, mobile devices, and the runtime.",
+  "description": "Install and manage the five Modular Improvement Plan bundles for workspaces, sessions, the runtime, plugins, and mobile devices.",
   "type": "module",
   "keywords": [
     "deepseek-harness",

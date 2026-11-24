@@ -24,5 +24,5 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## Published Atlas icons
 
-Workspace, Session, Plugin, Mobile, and Runtime Atlas declare the MIT license.
+Workspace, Session, Runtime, Plugin, and Mobile Atlas declare the MIT license.
 The [generated artwork module](src/client/published-icons.ts) records each npm package, version, and icon path.
