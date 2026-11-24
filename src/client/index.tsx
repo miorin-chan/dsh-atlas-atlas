@@ -47,6 +47,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export function apply(ctx: ClientContext): void {
   const manager = ctx.remote.pluginManager
   const repositoryForm = ctx.configForms.get<RepositorySettings>(ENTRY_ID)
+  const subscribeRepository = (listener: () => void) => repositoryForm.subscribe(listener)
+  const repositorySnapshot = () => repositoryForm.getSnapshot()
   const listeners = new Set<() => void>()
   let snapshot: Snapshot = { inventory: undefined, notices: {} }
   let refreshId = 0
@@ -128,7 +130,7 @@ export function apply(ctx: ClientContext): void {
     const canInstall = useRemoteAccess('pluginManager/installBundle')
     const canInspect = useRemoteAccess('pluginManager/inspect')
     const canRemove = useRemoteAccess('pluginManager/removeBundle')
-    const settings = useSyncExternalStore(repositoryForm.subscribe, repositoryForm.getSnapshot)
+    const settings = useSyncExternalStore(subscribeRepository, repositorySnapshot)
     const [draft, setDraft] = useState<string>()
     const [uninstallTarget, setUninstallTarget] = useState<Atlas>()
     const uninstallDialog = useRef<HTMLDialogElement>(null)

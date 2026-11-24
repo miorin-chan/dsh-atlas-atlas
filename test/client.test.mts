@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { test } from 'node:test'
+import { createElement } from 'react'
+import { act, create } from 'react-test-renderer'
 
 let registration
 globalThis.window = { __ModuleLoader__: { load(entry) { registration = entry } } }
@@ -79,4 +81,49 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
   assert.equal(locales.size, 0)
   assert.equal(slots.size, 0)
   assert.equal(subscriptions.size, 0)
+})
+
+test('renders five Atlas switches and observes the receiver-bound repository form', async () => {
+  const effects = []
+  const form = {
+    snapshot: { status: 'ready', writable: true, value: { useLocalRepositories: false, localRepositoryParent: '/repos' } },
+    listeners: new Set<() => void>(),
+    getSnapshot() { return this.snapshot },
+    subscribe(listener: () => void) {
+      this.listeners.add(listener)
+      return () => this.listeners.delete(listener)
+    },
+  }
+  let Panel
+  plugin.apply({
+    effect(install) { effects.push(install()) },
+    on: () => () => {},
+    remote: { pluginManager: { async listBundles() { return { ok: true, value: [] } } }, $on: () => () => {} },
+    configForms: { get: () => form },
+    locale: { bind: () => key => key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
+    slots: {
+      inject: (_, register) => register(),
+      register(_, render) { Panel = render; return () => {} },
+    },
+  })
+  let view
+  try {
+    assert.ok(Panel)
+    await act(async () => { view = create(createElement(Panel, { view: 'page', useRemoteAccess: () => true })) })
+    const switches = view.root.findAllByProps({ role: 'switch' })
+    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile'])
+    const repositorySwitch = switches.find(item => item.props['aria-labelledby'] !== undefined)
+    assert.equal(repositorySwitch?.props['aria-checked'], false)
+    assert.equal(form.listeners.size, 1)
+
+    act(() => {
+      form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, useLocalRepositories: true } }
+      for (const listener of form.listeners) listener()
+    })
+    assert.equal(repositorySwitch.props['aria-checked'], true)
+  } finally {
+    if (view !== undefined) act(() => view.unmount())
+    for (const dispose of effects.reverse()) dispose()
+  }
+  assert.equal(form.listeners.size, 0)
 })
