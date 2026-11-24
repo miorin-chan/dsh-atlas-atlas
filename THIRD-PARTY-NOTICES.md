@@ -22,7 +22,8 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMA
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## Published Atlas icons
+## Atlas member icons
 
-Workspace, Session, Runtime, Plugin, and Mobile Atlas declare the MIT license.
-The [generated artwork module](src/client/published-icons.ts) records each npm package, version, and icon path.
+Workspace, Session, List, Plugin, and Mobile Atlas declare the MIT license.
+The [artwork module](src/client/published-icons.ts) records each package, version, and icon path.
+The List icon comes from the local List Atlas source for the planned npm version `0.1.0`.

@@ -4,7 +4,7 @@ export const PACKAGE = '@miorin/dsh-atlas-atlas'
 export const ATLAS_BUNDLES = {
   workspace: '@miorin/dsh-atlas-workspace',
   session: '@miorin/dsh-atlas-session',
-  runtime: '@miorin/dsh-atlas-runtime',
+  list: '@miorin/dsh-atlas-list',
   plugin: '@miorin/dsh-atlas-plugin',
   mobile: '@miorin/dsh-atlas-mobile',
 } as const

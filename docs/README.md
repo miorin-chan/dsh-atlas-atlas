@@ -11,20 +11,21 @@
 
 ## 行为
 
-管理卡通过 `plugins.bundle.config` 插槽渲染五个开关。
+管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端的顺序渲染五个开关。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
 
-首次开启时，管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，保存实际安装的精确版本。
+开启尚未安装的成员包时，管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，保存实际安装的精确版本。
 安装后先读取目标 bundle，检查行 ID 是否已由其他启用的 bundle 定义，再保存启用状态。
 若启用在保存选择后失败，管理卡尝试恢复停用状态并报告结果。
 再次开启和关闭都使用 `setBundleEnabled`，复用已有安装和逐项设置。
 
 ## 成员图标
 
-开关行使用各成员包已发布到 npm 的图标。
+开关行显示各成员包的图标。日常构建和页面直接使用随插件保存的图标，成员尚未安装时也有图标。
+[图标清单](../src/client/published-icons.ts) 记录包名、版本和资源路径。
+列表图标取自本地 List Atlas 源码，对应计划发布的 npm `0.1.0`。
 `npm pack` 在打包前执行 `npm run sync:atlas-icons`，从各成员包的 `latest` 版本读取图标，再构建客户端。
-生成的 [图标清单](../src/client/published-icons.ts) 记录包名、版本和资源路径。
-日常构建和页面显示直接使用随插件保存的图标，成员尚未安装时也有图标。
+列表包发布后即可执行这一步。
 
 ## 本地安装与开发检查
 
@@ -43,7 +44,7 @@ npm run check
 
 从工作区运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
 测试覆盖五个成员包的 npm 首次安装与已有安装复用，以及包文件缺失、并行安装、行 ID 冲突和启用失败后的状态。
-客户端测试核对插槽的注册和释放，以及运行时开关的八语标题。
+客户端测试核对插槽的注册和释放，以及列表开关的八语标题。
 开关适配的官方代码版本和许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)。
 
 ## 一次性 profile 实测（0.1.0）

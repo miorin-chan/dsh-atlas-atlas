@@ -31,8 +31,8 @@ function fixture(others = []) {
 const ignoreProgress = () => {}
 
 test('installs and enables each missing Atlas from the npm registry and reuses it on the next enable', async () => {
-  assert.deepEqual(Object.keys(ATLAS_BUNDLES), ['workspace', 'session', 'runtime', 'plugin', 'mobile'])
-  assert.equal(ATLAS_BUNDLES.runtime, '@miorin/dsh-atlas-runtime')
+  assert.deepEqual(Object.keys(ATLAS_BUNDLES), ['workspace', 'session', 'list', 'plugin', 'mobile'])
+  assert.equal(ATLAS_BUNDLES.list, '@miorin/dsh-atlas-list')
   const { manager, profile, writes } = fixture()
   for (const [atlas, name] of Object.entries(ATLAS_BUNDLES)) {
     const stages = []
@@ -52,10 +52,14 @@ test('installs and enables each missing Atlas from the npm registry and reuses i
   assert.ok(Object.values(ATLAS_BUNDLES).every(name => profile.get(name).enabled))
 })
 
-test('reuses an existing installation even if its source is a local link', async () => {
-  const { manager, writes } = fixture([newBundle(workspace, { source: 'link:/atlas/dsh-atlas-workspace' })])
-  assert.equal(await setAtlasEnabled(manager, 'workspace', true, ignoreProgress), undefined)
-  assert.deepEqual(writes, [['set', workspace, true]])
+test('toggles a locally linked List Atlas without installing from npm', async () => {
+  const list = ATLAS_BUNDLES.list
+  const { manager, profile, writes } = fixture([newBundle(list, { source: 'link:/atlas/dsh-atlas-list' })])
+  assert.equal(await setAtlasEnabled(manager, 'list', true, ignoreProgress), undefined)
+  assert.equal(profile.get(list).enabled, true)
+  assert.equal(await setAtlasEnabled(manager, 'list', false, ignoreProgress), undefined)
+  assert.equal(profile.get(list).enabled, false)
+  assert.deepEqual(writes, [['set', list, true], ['set', list, false]])
 })
 
 test('reports missing files for a declared dependency without replacing it', async () => {
