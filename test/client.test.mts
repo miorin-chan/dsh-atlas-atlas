@@ -68,6 +68,7 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
       assert.equal(meta.title, '模块模块化改良计划')
       continue
     }
+    if (language === 'en') assert.equal(meta.title, 'Atlas Modular Improvement Plan')
     for (const text of [meta.title, meta.description, ...Object.values(localized)]) {
       assert.doesNotMatch(text, /模块化改良计划/u, language)
     }

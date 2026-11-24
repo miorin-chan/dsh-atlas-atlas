@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Modular Improvement Plan Manager",
+    "title": "Atlas Modular Improvement Plan",
     "description": "Enable the manager to install the five Modular Improvement Plan bundles from npm and turn each one on or off here.",
     "detail": "docs/DETAIL.en.md"
   }
