@@ -85,10 +85,51 @@ export const CSS = `
 }
 .dsh-atlas-manager-control {
   display: grid;
-  grid-template-columns: 14px 36px;
+  grid-template-columns: 14px 28px 36px;
   align-items: center;
   gap: 8px;
 }
+.dsh-atlas-manager-control > .dsh-atlas-manager-switch { grid-column: 3; }
+/* Danger outline follows .danger in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5,
+   src/client/PluginManagerPage.module.css. See THIRD-PARTY-NOTICES.md. */
+.dsh-atlas-manager-danger,
+.dsh-atlas-manager-trash {
+  color: var(--dsw-alias-state-error-primary);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);
+}
+.dsh-atlas-manager-danger:hover:not(:disabled), .dsh-atlas-manager-trash:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+}
+.dsh-atlas-manager-trash {
+  grid-column: 2;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+.dsh-atlas-manager-trash:disabled { cursor: default; opacity: 0.55; }
+.dsh-atlas-manager-uninstall-dialog {
+  max-inline-size: min(25rem, calc(100% - 2rem));
+  box-sizing: border-box;
+  padding: 20px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+.dsh-atlas-manager-uninstall-dialog::backdrop {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 30%, transparent);
+}
+.dsh-atlas-manager-uninstall-dialog h4, .dsh-atlas-manager-uninstall-dialog p { margin: 0 0 8px; }
+.dsh-atlas-manager-uninstall-dialog > div { display: flex; justify-content: flex-end; gap: 8px; }
 .dsh-atlas-manager-spinner {
   box-sizing: border-box;
   width: 14px;
@@ -117,7 +158,7 @@ export const CSS = `
 }
 .dsh-atlas-manager-switch[aria-disabled='true'] { cursor: default; opacity: 0.55; }
 .dsh-atlas-manager-switch:focus-visible, .dsh-atlas-manager-retry:focus-visible,
-.dsh-atlas-manager-path-controls > input:focus-visible {
+.dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: 2px;
 }

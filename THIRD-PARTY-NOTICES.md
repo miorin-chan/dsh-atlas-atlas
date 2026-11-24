@@ -2,6 +2,8 @@
 
 Atlas manager adapts the switch markup and styling from `@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5`,
 `src/Switch.tsx` (`Switch`) and `src/Switch.module.css` (`switch` and `thumb`).
+The uninstall button follows the danger outline styling in `@deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5`,
+`src/client/PluginManagerPage.module.css` (`.danger`).
 
 MIT License
 

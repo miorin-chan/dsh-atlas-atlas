@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ATLAS_BUNDLES, PACKAGE, linkAtlas, localAtlasSpec, setAtlasEnabled } from '../lib/atlas.js'
+import { ATLAS_BUNDLES, PACKAGE, canUninstallAtlas, linkAtlas, localAtlasSpec, setAtlasEnabled, uninstallAtlas } from '../lib/atlas.js'
 
 const workspace = ATLAS_BUNDLES.workspace
 const success = value => ({ ok: true, value })
@@ -85,6 +85,38 @@ function localFixture(others = []) {
   }
   return { manager, profile, writes }
 }
+
+test('only uninstalls the requested installed, disabled, removable Atlas', async () => {
+  const entry = newBundle(workspace, { removable: true, source: workspaceSpec })
+  const unrelated = newBundle(ATLAS_BUNDLES.list, { enabled: true })
+  const { manager, profile, writes } = localFixture([entry, unrelated])
+  assert.equal(canUninstallAtlas(entry), true)
+  for (const invalid of [
+    { ...entry, enabled: true }, { ...entry, installed: false },
+    { ...entry, removable: false }, { ...entry, readOnlyReason: 'management-required' }, undefined,
+  ]) {
+    if (invalid === undefined) profile.delete(workspace)
+    else profile.set(workspace, invalid)
+    assert.equal(canUninstallAtlas(invalid), false)
+    assert.deepEqual(await uninstallAtlas(manager, 'workspace'), { kind: 'uninstallUnavailable' })
+    assert.equal(profile.get(workspace), invalid)
+    assert.deepEqual(writes, [])
+  }
+  profile.set(workspace, entry)
+  assert.equal(await uninstallAtlas(manager, 'workspace'), undefined)
+  assert.deepEqual(writes, [['remove', workspace]])
+  assert.equal(profile.has(workspace), false)
+  assert.equal(profile.get(ATLAS_BUNDLES.list), unrelated)
+  assert.equal(profile.get(PACKAGE).enabled, true)
+})
+
+test('reports the DSH diagnosis when uninstalling fails', async () => {
+  const entry = newBundle(workspace, { removable: true })
+  const { manager, profile } = localFixture([entry])
+  manager.removeBundle = async () => success({ application: 'failed', error: { code: 'bundle-in-use' } })
+  assert.deepEqual(await uninstallAtlas(manager, 'workspace'), { kind: 'uninstallFailed', detail: 'bundle-in-use' })
+  assert.equal(profile.get(workspace), entry)
+})
 
 const workspaceOptions = { enabled: false, expected: { name: workspace, version: '0.2.0' } }
 

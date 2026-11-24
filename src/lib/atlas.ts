@@ -16,10 +16,10 @@ export interface RepositorySettings {
   useLocalRepositories: boolean
   localRepositoryParent: string
 }
-export type Progress = 'installing' | 'enabling' | 'disabling'
-export type Failure = 'installFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed'
+export type Progress = 'installing' | 'enabling' | 'disabling' | 'uninstalling'
+export type Failure = 'installFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
 export type Notice =
-  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' }
+  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'uninstallUnavailable' }
   | { kind: Failure | 'localLinkFailed'; detail?: string }
   | { kind: 'conflict'; bundle: string; row: string }
 
@@ -41,6 +41,22 @@ function outcome(result: ChangeResult, failure: Failure): Notice | undefined {
     case 'overridden': return { kind: 'overridden' }
     case 'cancelled': return { kind: 'cancelled' }
     case 'failed': return { kind: failure, detail: resultDetail(result) }
+  }
+}
+
+export function canUninstallAtlas(bundle: BundleInfo | undefined): boolean {
+  return bundle?.installed === true && !bundle.enabled && bundle.removable && bundle.readOnlyReason === undefined
+}
+
+export async function uninstallAtlas(manager: Manager, atlas: Atlas): Promise<Notice | undefined> {
+  try {
+    const name = ATLAS_BUNDLES[atlas]
+    const inventory = resultValue(await manager.listBundles())
+    // Recheck after confirmation in case the inventory changed while the dialog was open.
+    if (!canUninstallAtlas(inventory.find(bundle => bundle.name === name))) return { kind: 'uninstallUnavailable' }
+    return outcome(resultValue(await manager.removeBundle(name)), 'uninstallFailed')
+  } catch (error) {
+    return { kind: 'uninstallFailed', detail: error instanceof Error ? error.message : String(error) }
   }
 }
 

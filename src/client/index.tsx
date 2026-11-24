@@ -9,9 +9,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
-import { useEffect, useId, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  absoluteRepositoryParent, ATLAS_BUNDLES, ENTRY_ID, linkAtlas, localAtlasSpec, PACKAGE, setAtlasEnabled,
+  absoluteRepositoryParent, ATLAS_BUNDLES, canUninstallAtlas, ENTRY_ID, linkAtlas, localAtlasSpec, PACKAGE,
+  setAtlasEnabled, uninstallAtlas,
   type Atlas, type Notice, type Progress, type RepositorySettings,
 } from '../lib/atlas.js'
 import { LABELS } from './labels.js'
@@ -78,7 +79,8 @@ export function apply(ctx: ClientContext): void {
       for (const atlas of ATLASES) {
         const action = notices[atlas]
         if (action === undefined || action.notice.kind === 'restart' || action.notice.kind === 'rollbackFailed' ||
-          action.notice.kind === 'localLinkFailed' || action.notice.kind === 'enableFailed') continue
+          action.notice.kind === 'localLinkFailed' || action.notice.kind === 'enableFailed' ||
+          action.notice.kind === 'uninstallFailed' || action.notice.kind === 'uninstallUnavailable') continue
         const bundle = inventory.find(item => item.name === ATLAS_BUNDLES[atlas])
         const selected = bundle?.enabled === true
         if (selected === action.enabled && (!selected || (bundle.availability !== 'missing' && bundle.error === undefined))) {
@@ -100,13 +102,22 @@ export function apply(ctx: ClientContext): void {
     update({ activity: undefined })
   }
 
+  async function uninstall(atlas: Atlas): Promise<void> {
+    if (snapshot.activity !== undefined || disposed) return
+    update({ activity: { atlas, stage: 'uninstalling' }, notices: { ...snapshot.notices, [atlas]: undefined } })
+    const notice = await uninstallAtlas(manager, atlas)
+    update({ notices: { ...snapshot.notices, [atlas]: notice && { enabled: false, notice } } })
+    await refresh()
+    update({ activity: undefined })
+  }
+
   const t = ctx.locale.bind(NS)
   const subscribeLocale = (listener: () => void) => ctx.locale.subscribe(listener)
   const localeSnapshot = () => ctx.locale.getSnapshot()
 
   function NoticeLine({ notice }: { notice: Notice }) {
     const { kind } = notice
-    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'conflict'
+    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'conflict' || kind === 'uninstallUnavailable'
     const message = notice.kind === 'conflict' ? t('conflict', { bundle: notice.bundle, row: notice.row }) : t(kind)
     return <p className="dsh-atlas-manager-status" data-atlas-status={kind} data-error={error ? '' : undefined}>{message}</p>
   }
@@ -119,6 +130,10 @@ export function apply(ctx: ClientContext): void {
     const canRemove = useRemoteAccess('pluginManager/removeBundle')
     const settings = useSyncExternalStore(repositoryForm.subscribe, repositoryForm.getSnapshot)
     const [draft, setDraft] = useState<string>()
+    const [uninstallTarget, setUninstallTarget] = useState<Atlas>()
+    const uninstallDialog = useRef<HTMLDialogElement>(null)
+    const cancelUninstall = useRef<HTMLButtonElement>(null)
+    const memberStatus = useRef<Partial<Record<Atlas, HTMLDivElement | null>>>({})
     const [saving, setSaving] = useState(false)
     const [saveFailed, setSaveFailed] = useState(false)
     const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
@@ -132,11 +147,29 @@ export function apply(ctx: ClientContext): void {
       return () => { observing = false }
     }, [canList])
 
+    useEffect(() => {
+      const dialog = uninstallDialog.current
+      if (uninstallTarget === undefined || !dialog || dialog.open) return
+      dialog.showModal()
+      cancelUninstall.current?.focus()
+    }, [uninstallTarget])
+
     if (!canList) return <p className="dsh-atlas-manager-status">{t('readDenied')}</p>
     if (inventory === undefined) return <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
     if (inventory === 'failed') return (
       <div>
-        <p className="dsh-atlas-manager-status" data-error="" role="status">{t('inventoryFailed')}</p>
+        <div role="status">
+          <p className="dsh-atlas-manager-status" data-error="">{t('inventoryFailed')}</p>
+          {ATLASES.map(atlas => {
+            const notice = notices[atlas]?.notice
+            if (notice?.kind !== 'uninstallFailed' && notice?.kind !== 'uninstallUnavailable') return null
+            return <div key={atlas}>
+              <div className="dsh-atlas-manager-label">{t(atlas)}</div>
+              <NoticeLine notice={notice} />
+              {'detail' in notice && notice.detail && <code className="dsh-atlas-manager-status">{notice.detail}</code>}
+            </div>
+          })}
+        </div>
         <button type="button" className="dsh-atlas-manager-retry" onClick={() => { void refresh() }}>{t('retry')}</button>
       </div>
     )
@@ -237,6 +270,7 @@ export function apply(ctx: ClientContext): void {
               (local && (bundle.availability === 'missing' || bundle.source !== localAtlasSpec(localParent ?? '', atlas)))
             const denied = !canToggle || bundle?.readOnlyReason !== undefined || (!enabled && needsInstall &&
               (!canInstall || settings.status !== 'ready' || (local && (!canInspect || (bundle?.installed && !canRemove)))))
+            const showUninstall = canRemove && canUninstallAtlas(bundle)
             const stage = activity?.atlas === atlas ? activity.stage : undefined
             const notice = stage === undefined ? notices[atlas]?.notice : undefined
             const detail = stage === undefined ? notice && 'detail' in notice ? notice.detail : bundle?.error?.diagnostic : undefined
@@ -251,7 +285,7 @@ export function apply(ctx: ClientContext): void {
                 </span>
                 <div className="dsh-atlas-manager-copy">
                   <div className="dsh-atlas-manager-label">{t(atlas)}</div>
-                  <div id={statusId} role="status">
+                  <div id={statusId} role="status" tabIndex={-1} ref={node => { memberStatus.current[atlas] = node }}>
                     <p className="dsh-atlas-manager-status" data-atlas-status={status}
                       data-error={status === 'bundleError' ? '' : undefined}>{t(status)}</p>
                     {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
@@ -264,6 +298,14 @@ export function apply(ctx: ClientContext): void {
                 </div>
                 <div className="dsh-atlas-manager-control">
                   {stage && <span className="dsh-atlas-manager-spinner" aria-hidden="true" />}
+                  {showUninstall && <button type="button" className="dsh-atlas-manager-trash"
+                    aria-haspopup="dialog" aria-label={t('uninstallLabel', { name: t(atlas) })} title={t('uninstall')}
+                    disabled={busy || draft !== undefined} onClick={() => setUninstallTarget(atlas)}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                      strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.55 8.15c.04.52.47.85 1 .85h4.9c.53 0 .96-.33 1-.85L12 4.5M6.75 7v4M9.25 7v4" />
+                    </svg>
+                  </button>}
                   <button type="button" role="switch" className="dsh-atlas-manager-switch"
                     aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
                     aria-busy={stage !== undefined} aria-disabled={busy || draft !== undefined || denied}
@@ -278,6 +320,23 @@ export function apply(ctx: ClientContext): void {
             )
           })}
         </ul>
+        <dialog ref={uninstallDialog} className="dsh-atlas-manager-uninstall-dialog"
+          aria-labelledby={`${listId}-uninstall-title`} aria-describedby={`${listId}-uninstall-description`}
+          onClose={() => setUninstallTarget(undefined)}>
+          <h4 id={`${listId}-uninstall-title`}>{uninstallTarget && t('uninstallLabel', { name: t(uninstallTarget) })}</h4>
+          <p id={`${listId}-uninstall-description`}>{t('uninstallConfirm')}</p>
+          <div>
+            <button type="button" ref={cancelUninstall} className="dsh-atlas-manager-retry"
+              onClick={() => uninstallDialog.current?.close()}>{t('cancelUninstall')}</button>
+            <button type="button" className="dsh-atlas-manager-retry dsh-atlas-manager-danger"
+              disabled={!canRemove || busy || uninstallTarget === undefined} onClick={() => {
+                if (uninstallTarget === undefined || !canRemove || busy) return
+                uninstallDialog.current?.close()
+                memberStatus.current[uninstallTarget]?.focus()
+                void uninstall(uninstallTarget)
+              }}>{t('uninstall')}</button>
+          </div>
+        </dialog>
       </div>
     )
   }
