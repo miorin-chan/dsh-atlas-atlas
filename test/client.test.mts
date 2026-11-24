@@ -23,6 +23,7 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
     effect(install) { effects.push(install()) },
     on: subscribe,
     remote: { pluginManager: {}, $on: subscribe },
+    configForms: { get(id) { assert.equal(id, 'dsh-atlas-atlas'); return {} } },
     locale: {
       bind: () => key => key,
       register(namespace, labels) {
@@ -41,7 +42,7 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
       },
     },
   }
-  assert.deepEqual(plugin.inject, ['locale', 'slots', 'remote', 'remote.pluginManager'])
+  assert.deepEqual(plugin.inject, ['locale', 'slots', 'remote', 'remote.pluginManager', 'configForms'])
   plugin.apply(ctx)
 
   const slot = slots.get('@miorin/dsh-atlas-atlas')

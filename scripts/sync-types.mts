@@ -32,17 +32,17 @@ if (installDir === undefined || installDir === '') {
 interface Versions {
   dsh: string
   cordis: string
+  schemastery: string
 }
 
 /** The CLI version and the Cordis version the installation carries. */
 function installedVersions(installDir: string): Versions {
   try {
     const dsh = JSON.parse(require('node:fs').readFileSync(resolve(installDir, 'package.json'), 'utf8'))
-    const cordis = JSON.parse(require('node:fs').readFileSync(
-      resolve(dirname(require.resolve('@deepseek-ai/cordis/package.json', { paths: [installDir] })), 'package.json'),
-      'utf8',
-    ))
-    return { dsh: dsh.version, cordis: cordis.version }
+    const installed = (name: string) => JSON.parse(require('node:fs').readFileSync(
+      require.resolve(`${name}/package.json`, { paths: [installDir] }), 'utf8',
+    )).version
+    return { dsh: dsh.version, cordis: installed('@deepseek-ai/cordis'), schemastery: installed('@deepseek-ai/schemastery') }
   } catch (error) {
     const electron = process.env.DSH_NODE_EXECUTABLE
     if (electron === undefined || electron === '') throw error
@@ -53,7 +53,8 @@ function installedVersions(installDir: string): Versions {
       const req = createRequire(resolve(install, 'package.json'))
       const dsh = req('./package.json').version
       const cordis = req('@deepseek-ai/cordis/package.json').version
-      console.log(JSON.stringify({ dsh, cordis }))
+      const schemastery = req('@deepseek-ai/schemastery/package.json').version
+      console.log(JSON.stringify({ dsh, cordis, schemastery }))
     `
     const out = execFileSync(electron, ['-e', script], {
       encoding: 'utf8',
@@ -67,7 +68,8 @@ const versions = installedVersions(installDir)
 const dshVersion = versions.dsh
 const cordisVersion = versions.cordis
 
-const expected = (name: string) => (name === '@deepseek-ai/cordis' ? cordisVersion : dshVersion)
+const expected = (name: string) => name === '@deepseek-ai/cordis' ? cordisVersion
+  : name === '@deepseek-ai/schemastery' ? versions.schemastery : dshVersion
 
 const pkg = JSON.parse(await readFile(resolve(ROOT, 'package.json'), 'utf8')) as { devDependencies?: Record<string, string> }
 const devDependencies = pkg.devDependencies ?? {}

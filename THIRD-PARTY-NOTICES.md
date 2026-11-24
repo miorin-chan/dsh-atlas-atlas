@@ -22,6 +22,11 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMA
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+## Host configuration schema
+
+The Host artifact bundles `@deepseek-ai/schemastery` 3.19.0 and `@deepseek-ai/cosmokit` 1.9.0.
+The MIT license text above also applies to these packages, copyright (c) 2021–present Shigma.
+
 ## Atlas member icons
 
 Workspace, Session, List, Plugin, and Mobile Atlas declare the MIT license.

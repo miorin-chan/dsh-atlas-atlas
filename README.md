@@ -13,4 +13,14 @@ Install [List Atlas](https://github.com/miorin-chan/dsh-atlas-list) from its loc
 DSH can install the other bundles from npm.
 Turning a bundle off keeps the installed copy and its plugin settings.
 
+To use local checkouts, turn on **Use local repository links**,
+enter the absolute directory containing `dsh-atlas-workspace`, `dsh-atlas-session`,
+and the other member repositories, then select **Save and link**.
+Prepare the checkouts as their READMEs describe before linking.
+Saving switches the source of installed members while keeping their on/off selections.
+Members that are not installed link the first time you enable them.
+If a link fails, check the member’s error details.
+The manager does not reinstall the previous copy.
+Turning off local mode keeps existing links.
+
 [Development and verification](docs/README.md)

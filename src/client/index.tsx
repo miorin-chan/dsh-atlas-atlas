@@ -5,11 +5,15 @@ import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
-import { useEffect, useId, useSyncExternalStore } from 'react'
-import { ATLAS_BUNDLES, PACKAGE, setAtlasEnabled, type Atlas, type Notice, type Progress } from '../lib/atlas.js'
+import { useEffect, useId, useState, useSyncExternalStore } from 'react'
+import {
+  absoluteRepositoryParent, ATLAS_BUNDLES, ENTRY_ID, linkAtlas, localAtlasSpec, PACKAGE, setAtlasEnabled,
+  type Atlas, type Notice, type Progress, type RepositorySettings,
+} from '../lib/atlas.js'
 import { LABELS } from './labels.js'
 import { ATLAS_ICONS } from './published-icons.js'
 import { CSS } from './styles.js'
@@ -17,12 +21,13 @@ import { CSS } from './styles.js'
 const NS = 'dsh-atlas-atlas'
 const SLOT = 'plugins.bundle.config'
 const ATLASES = Object.keys(ATLAS_BUNDLES) as Atlas[]
-export const inject = ['locale', 'slots', 'remote', 'remote.pluginManager']
+export const inject = ['locale', 'slots', 'remote', 'remote.pluginManager', 'configForms']
 
 type ClientContext = Pick<Context, 'effect' | 'on'> & {
   locale: LocaleRuntime
   slots: SlotRegistry
   remote: ClientRemote
+  configForms: Context['configForms']
 }
 type PanelProps = PluginConfigViewProps & Pick<PropsRuntime<typeof SLOT>, 'useRemoteAccess'>
 type Inventory = readonly BundleInfo[] | 'failed' | undefined
@@ -40,6 +45,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 export function apply(ctx: ClientContext): void {
   const manager = ctx.remote.pluginManager
+  const repositoryForm = ctx.configForms.get<RepositorySettings>(ENTRY_ID)
   const listeners = new Set<() => void>()
   let snapshot: Snapshot = { inventory: undefined, notices: {} }
   let refreshId = 0
@@ -71,7 +77,8 @@ export function apply(ctx: ClientContext): void {
     if (inventory !== 'failed') {
       for (const atlas of ATLASES) {
         const action = notices[atlas]
-        if (action === undefined || action.notice.kind === 'restart' || action.notice.kind === 'rollbackFailed') continue
+        if (action === undefined || action.notice.kind === 'restart' || action.notice.kind === 'rollbackFailed' ||
+          action.notice.kind === 'localLinkFailed' || action.notice.kind === 'enableFailed') continue
         const bundle = inventory.find(item => item.name === ATLAS_BUNDLES[atlas])
         const selected = bundle?.enabled === true
         if (selected === action.enabled && (!selected || (bundle.availability !== 'missing' && bundle.error === undefined))) {
@@ -82,12 +89,12 @@ export function apply(ctx: ClientContext): void {
     update({ inventory, notices })
   }
 
-  async function toggle(atlas: Atlas, enabled: boolean, needsInstall: boolean): Promise<void> {
+  async function toggle(atlas: Atlas, enabled: boolean, needsInstall: boolean, localParent?: string): Promise<void> {
     if (snapshot.activity !== undefined || disposed) return
     const progress = (stage: Progress) => update({ activity: { atlas, stage } })
     progress(enabled ? needsInstall ? 'installing' : 'enabling' : 'disabling')
     update({ notices: { ...snapshot.notices, [atlas]: undefined } })
-    const notice = await setAtlasEnabled(manager, atlas, enabled, progress)
+    const notice = await setAtlasEnabled(manager, atlas, enabled, progress, localParent)
     update({ notices: { ...snapshot.notices, [atlas]: notice && { enabled, notice } } })
     await refresh()
     update({ activity: undefined })
@@ -108,6 +115,12 @@ export function apply(ctx: ClientContext): void {
     const canList = useRemoteAccess('pluginManager/listBundles')
     const canToggle = useRemoteAccess('pluginManager/setBundleEnabled')
     const canInstall = useRemoteAccess('pluginManager/installBundle')
+    const canInspect = useRemoteAccess('pluginManager/inspect')
+    const canRemove = useRemoteAccess('pluginManager/removeBundle')
+    const settings = useSyncExternalStore(repositoryForm.subscribe, repositoryForm.getSnapshot)
+    const [draft, setDraft] = useState<string>()
+    const [saving, setSaving] = useState(false)
+    const [saveFailed, setSaveFailed] = useState(false)
     const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
     useSyncExternalStore(subscribeLocale, localeSnapshot)
     const listId = useId()
@@ -128,20 +141,107 @@ export function apply(ctx: ClientContext): void {
       </div>
     )
 
+    const local = settings.value?.useLocalRepositories === true
+    const path = draft ?? settings.value?.localRepositoryParent ?? ''
+    const parent = absoluteRepositoryParent(path)
+    const showPath = local || draft !== undefined
+    const busy = saving || activity !== undefined
+    const canEdit = settings.status === 'ready' && settings.writable
+    const needsRemoval = ATLASES.some(atlas => inventory.some(bundle =>
+      bundle.name === ATLAS_BUNDLES[atlas] && bundle.installed &&
+      (bundle.availability === 'missing' || bundle.source !== localAtlasSpec(path, atlas))))
+    const canLink = canInstall && canInspect && canToggle && (!needsRemoval || canRemove)
+    const pathId = `${listId}-repository-parent`
+
+    async function saveRepositoryMode(next: boolean) {
+      if (busy || !canEdit || (next && (parent === undefined || !canLink))) return
+      setSaving(true)
+      setSaveFailed(false)
+      try {
+        const saved = await repositoryForm.mutate([
+          { op: 'set', path: ['useLocalRepositories'], value: next },
+          ...next && parent !== undefined ? [{ op: 'set' as const, path: ['localRepositoryParent'], value: parent }] : [],
+        ], settings.revision)
+        if (!saved) { setSaveFailed(true); return }
+        setDraft(undefined)
+        if (!next || parent === undefined) return
+        const current = await manager.listBundles()
+        if (!current.ok) { setSaveFailed(true); return }
+        for (const atlas of ATLASES) {
+          const bundle = current.value.find(item => item.name === ATLAS_BUNDLES[atlas])
+          const previous = snapshot.notices[atlas]
+          const retry = previous?.notice.kind === 'localLinkFailed'
+          if ((!bundle?.installed && !retry) ||
+            (bundle?.source === localAtlasSpec(parent, atlas) && bundle?.availability === 'profile' && !retry)) continue
+          const enabled = retry ? previous.enabled : bundle?.enabled === true
+          const progress = (stage: Progress) => update({ activity: { atlas, stage } })
+          progress('installing')
+          const notice = enabled
+            ? await setAtlasEnabled(manager, atlas, true, progress, parent)
+            : await linkAtlas(manager, atlas, parent, bundle)
+          update({ notices: { ...snapshot.notices, [atlas]: notice && { enabled, notice } } })
+        }
+        await refresh()
+      } catch {
+        setSaveFailed(true)
+      } finally {
+        update({ activity: undefined })
+        setSaving(false)
+      }
+    }
+
     return (
       <div data-atlas-manager="">
+        <section className="dsh-atlas-manager-repositories" aria-busy={saving}>
+          <div className="dsh-atlas-manager-repository-row">
+            <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('useLocalRepositories')}</span>
+            <button type="button" role="switch" className="dsh-atlas-manager-switch"
+              aria-labelledby={`${pathId}-mode`} aria-checked={showPath} aria-disabled={!canEdit || busy}
+              aria-describedby={showPath ? `${pathId}-mode-help` : undefined}
+              disabled={!canEdit || busy} onClick={() => {
+                setSaveFailed(false)
+                if (local) void saveRepositoryMode(false)
+                else setDraft(showPath ? undefined : path)
+              }}>
+              <span className="dsh-atlas-manager-thumb" />
+            </button>
+          </div>
+          {showPath && <div className="dsh-atlas-manager-path">
+            <label htmlFor={pathId}>{t('localRepositoryParent')}</label>
+            <div className="dsh-atlas-manager-path-controls">
+              <input type="text" id={pathId} value={path} placeholder="/path/to/plugins" spellCheck={false}
+                autoComplete="off" aria-describedby={`${pathId}-help`}
+                aria-invalid={path !== '' && parent === undefined} disabled={!canEdit || busy}
+                onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
+                onKeyDown={event => { if (event.key === 'Enter') void saveRepositoryMode(true) }} />
+              <button type="button" className="dsh-atlas-manager-retry" disabled={!canEdit || !canLink || busy || parent === undefined}
+                onClick={() => { void saveRepositoryMode(true) }}>{t('saveAndLink')}</button>
+            </div>
+            <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={path !== '' && parent === undefined ? '' : undefined}>
+              {t(path !== '' && parent === undefined ? 'invalidRepositoryParent' : 'localRepositoryHelp')}
+            </p>
+            <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localRepositoryImpact')}</p>
+            {canEdit && !canLink && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
+          </div>}
+          {settings.status !== 'loading' && !canEdit && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
+          {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('repositoryApplyFailed')}</p>}
+        </section>
         <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
         <ul className="dsh-atlas-manager-list" aria-labelledby={listId}>
           {ATLASES.map(atlas => {
             const bundle = inventory.find(item => item.name === ATLAS_BUNDLES[atlas])
             const enabled = bundle?.enabled ?? false
-            const needsInstall = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
-            const denied = !canToggle || bundle?.readOnlyReason !== undefined || (!enabled && needsInstall && !canInstall)
+            const localParent = local ? settings.value?.localRepositoryParent : undefined
+            const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
+            const needsInstall = notInstalled ||
+              (local && (bundle.availability === 'missing' || bundle.source !== localAtlasSpec(localParent ?? '', atlas)))
+            const denied = !canToggle || bundle?.readOnlyReason !== undefined || (!enabled && needsInstall &&
+              (!canInstall || settings.status !== 'ready' || (local && (!canInspect || (bundle?.installed && !canRemove)))))
             const stage = activity?.atlas === atlas ? activity.stage : undefined
             const notice = stage === undefined ? notices[atlas]?.notice : undefined
             const detail = stage === undefined ? notice && 'detail' in notice ? notice.detail : bundle?.error?.diagnostic : undefined
             const status = stage ?? (bundle?.error !== undefined ? 'bundleError'
-              : enabled ? 'enabled' : needsInstall && !bundle?.installed ? 'notInstalled' : 'disabled')
+              : enabled ? 'enabled' : notInstalled ? 'notInstalled' : 'disabled')
             const statusId = `${listId}-${atlas}`
             return (
               <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
@@ -166,9 +266,11 @@ export function apply(ctx: ClientContext): void {
                   {stage && <span className="dsh-atlas-manager-spinner" aria-hidden="true" />}
                   <button type="button" role="switch" className="dsh-atlas-manager-switch"
                     aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
-                    aria-busy={stage !== undefined} aria-disabled={activity !== undefined || denied}
+                    aria-busy={stage !== undefined} aria-disabled={busy || draft !== undefined || denied}
                     disabled={denied}
-                    onClick={() => { if (!denied) void toggle(atlas, !enabled, needsInstall) }}>
+                    onClick={() => {
+                      if (!busy && draft === undefined && !denied) void toggle(atlas, !enabled, needsInstall, localParent)
+                    }}>
                     <span className="dsh-atlas-manager-thumb" />
                   </button>
                 </div>
