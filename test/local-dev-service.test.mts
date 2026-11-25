@@ -59,7 +59,8 @@ function createMemoryManager(profileDir: string, registryPackages: Map<string, s
         overrides: [],
       }))
     },
-    async inspect(spec: string) {
+    async inspect(spec: string, options?: unknown) {
+      assert.deepEqual(options, {})
       if (spec.startsWith('link:')) {
         const dir = spec.slice(5)
         const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))

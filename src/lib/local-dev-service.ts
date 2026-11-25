@@ -27,7 +27,7 @@ import { buildLocalMembersOverlay, verifyOverlay } from './overlay-builder.js'
 
 export interface PluginManagerLike {
   listBundles(): Promise<BundleInfo[]>
-  inspect(spec: string): Promise<PluginSpecInspection>
+  inspect(spec: string, options?: Record<string, unknown>): Promise<PluginSpecInspection>
   installBundle(spec: string, options: InstallBundleOptions): Promise<ChangeResult>
   removeBundle(name: string): Promise<ChangeResult>
 }
@@ -604,7 +604,7 @@ export class LocalDevService {
   }
 
   private async preflight(packageName: string, target: SourceRef, currentlyInstalled: boolean): Promise<void> {
-    const inspection = await this.options.manager.inspect(target.spec)
+    const inspection = await this.options.manager.inspect(target.spec, {})
     if (inspection.status === 'accepted') {
       const expectedKind = localPathOf(target.spec) !== undefined ? 'path' : 'registry'
       if (inspection.name !== packageName || inspection.version !== target.version
