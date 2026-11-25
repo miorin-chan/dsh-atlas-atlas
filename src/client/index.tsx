@@ -4,6 +4,15 @@ import type { BundleInfo, ClientRemote } from '@deepseek-ai/dsh-api-remotes/clie
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginConfigViewProps, PluginDetailProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+import {
+  Button,
+  IconChevronRightOutlineRegular,
+  IconChevronsUpDownOutlineMedium,
+  IconRightUpOutlineRegular,
+  IconTrashOutlineRegular,
+  Switch,
+  Tooltip,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -278,40 +287,35 @@ export function apply(ctx: ClientContext): void {
   }
 
   function ChevronArrow({ className }: { className: string }) {
+    return <IconChevronRightOutlineRegular size={12} className={className} aria-hidden />
+  }
+
+  function CollapseAllIcon() {
+    // Inward chevron mirror of IconChevronsUpDownOutlineMedium in @deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5.
     return (
       <svg
-        className={className}
-        width="12"
-        height="12"
-        viewBox="0 0 12 12"
+        width="14"
+        height="14"
+        viewBox="0 0 16 16"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.3"
         strokeLinecap="round"
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        <path d="M4.5 2.5 8 6l-3.5 3.5" />
+        <path d="m5.1 3.5 2.9 2.9 2.9-2.9" />
+        <path d="m5.1 12.5 2.9-2.9 2.9 2.9" />
       </svg>
     )
   }
 
+  function ExpandAllIcon({ expanded }: { expanded: boolean }) {
+    return expanded ? <CollapseAllIcon /> : <IconChevronsUpDownOutlineMedium size={14} aria-hidden />
+  }
+
   function OpenDetailsIcon() {
-    return (
-      <svg
-        width="12"
-        height="12"
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M3.5 8.5 8.5 3.5M4.5 3.5h4v4" />
-      </svg>
-    )
+    return <IconRightUpOutlineRegular size={12} aria-hidden />
   }
 
   function AtlasPanel({ useRemoteAccess, renderFactorySlot }: PanelProps) {
@@ -539,16 +543,17 @@ export function apply(ctx: ClientContext): void {
           <span>{displayName}</span>
         )}
         {canOpenBundle && (
-          <button
-            type="button"
-            className="dsh-atlas-detail-open"
-            data-atlas-open={packageName}
-            title={t('openBundleDetails', { name: displayName })}
-            aria-label={t('openBundleDetails', { name: displayName })}
-            onClick={() => openBundle(packageName)}
-          >
-            <OpenDetailsIcon />
-          </button>
+          <Tooltip label={t('openBundleDetails', { name: displayName })} side="top" portal delayMs={200}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="dsh-atlas-detail-open"
+              data-atlas-open={packageName}
+              aria-label={t('openBundleDetails', { name: displayName })}
+              icon={<OpenDetailsIcon />}
+              onClick={() => openBundle(packageName)}
+            />
+          </Tooltip>
         )}
       </>
     )
@@ -558,14 +563,12 @@ export function apply(ctx: ClientContext): void {
         <section className="dsh-atlas-manager-repositories" aria-busy={saving || localDevBusy}>
           <div className="dsh-atlas-manager-repository-row">
             <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('localDevToggle')}</span>
-            <button type="button" role="switch" className="dsh-atlas-manager-switch"
-              aria-labelledby={`${pathId}-mode`} aria-checked={localDevEnabled}
-              aria-disabled={!canEdit || busy}
-              aria-describedby={`${pathId}-mode-help`}
+            <Switch
+              checked={localDevEnabled}
+              label={t('localDevToggle')}
               disabled={!canEdit || busy}
-              onClick={() => { void toggleLocalDev(!localDevEnabled) }}>
-              <span className="dsh-atlas-manager-thumb" />
-            </button>
+              onChange={next => { void toggleLocalDev(next) }}
+            />
           </div>
           <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localDevHelp')}</p>
           {localDevEnabled && (
@@ -608,14 +611,18 @@ export function apply(ctx: ClientContext): void {
         <div className="dsh-atlas-manager-heading-row">
           <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
           {expandablePackages.length > 0 && (
-            <button
-              type="button"
-              className="dsh-atlas-expand-all"
-              data-atlas-expand-all=""
-              onClick={toggleExpandAll}
-            >
-              {t(allExpanded ? 'collapseAll' : 'expandAll')}
-            </button>
+            <Tooltip label={t(allExpanded ? 'collapseAll' : 'expandAll')} side="top" portal delayMs={200}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="dsh-atlas-expand-all"
+                data-atlas-expand-all=""
+                aria-label={t(allExpanded ? 'collapseAll' : 'expandAll')}
+                aria-pressed={allExpanded}
+                icon={<ExpandAllIcon expanded={allExpanded} />}
+                onClick={toggleExpandAll}
+              />
+            </Tooltip>
           )}
         </div>
         <ul className="dsh-atlas-manager-list" data-atlas-panel="bundles" aria-labelledby={listId}>
@@ -646,13 +653,19 @@ export function apply(ctx: ClientContext): void {
             const settingsBodyId = `${statusId}-settings`
             const memberCount = countBundleMembers(bundle, settingsEntry?.count)
             const onIconPress = canExpand ? () => toggleExpanded(packageName) : undefined
+            const routineStatus = status === 'enabled' || status === 'disabled'
             return (
-              <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
+              <li
+                key={atlas}
+                className="dsh-atlas-manager-row"
+                data-atlas={atlas}
+                data-atlas-state={enabled ? 'on' : 'off'}
+              >
                 <div className="dsh-atlas-manager-row-main">
                   {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
                   <BundleRowIcon
                     src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]}
-                    size={30}
+                    size={24}
                     onPress={onIconPress}
                   />
                   <div className="dsh-atlas-manager-copy">
@@ -674,10 +687,14 @@ export function apply(ctx: ClientContext): void {
                       )}
                     </div>
                     <div id={statusId} role="status" tabIndex={-1} ref={node => { memberStatus.current[atlas] = node }}>
-                      <p className="dsh-atlas-manager-status" data-atlas-status={status}
-                        data-error={status === 'bundleError' ? '' : undefined}>{t(status)}</p>
+                      <p
+                        className={routineStatus ? 'dsh-atlas-sr-only' : 'dsh-atlas-manager-status'}
+                        data-atlas-status={status}
+                        data-error={status === 'bundleError' ? '' : undefined}
+                      >
+                        {t(status)}
+                      </p>
                       {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-                      {atlas === 'continuity' && <p className="dsh-atlas-manager-status">{t('continuityMembers')}</p>}
                       {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired', { dir: localAtlasDir(atlas) })}</p>}
                       {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
                       {notice && <NoticeLine atlas={atlas} notice={notice} />}
@@ -703,25 +720,30 @@ export function apply(ctx: ClientContext): void {
                   </div>
                   <div className="dsh-atlas-manager-control">
                     {stage && <span className="dsh-atlas-manager-spinner" aria-hidden="true" />}
-                    {showUninstall && <button type="button" className="dsh-atlas-manager-trash"
-                      aria-haspopup="dialog" aria-label={t('uninstallLabel', { name: t(atlas) })} title={t('uninstall')}
-                      disabled={busy} onClick={() => setUninstallTarget(atlas)}>
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                        strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.55 8.15c.04.52.47.85 1 .85h4.9c.53 0 .96-.33 1-.85L12 4.5M6.75 7v4M9.25 7v4" />
-                      </svg>
-                    </button>}
-                    <button type="button" role="switch" className="dsh-atlas-manager-switch"
-                      aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
-                      aria-busy={stage !== undefined} aria-disabled={busy || denied || localInstallRequired || localWorkspaceRequired}
-                      disabled={denied || localInstallRequired || localWorkspaceRequired}
-                      onClick={() => {
+                    {showUninstall && (
+                      <Tooltip label={t('uninstall')} side="top" portal delayMs={200}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="dsh-atlas-manager-trash"
+                          aria-haspopup="dialog"
+                          aria-label={t('uninstallLabel', { name: t(atlas) })}
+                          disabled={busy}
+                          icon={<IconTrashOutlineRegular size={14} />}
+                          onClick={() => setUninstallTarget(atlas)}
+                        />
+                      </Tooltip>
+                    )}
+                    <Switch
+                      checked={enabled}
+                      label={t(atlas)}
+                      disabled={busy || denied || localInstallRequired || localWorkspaceRequired}
+                      onChange={next => {
                         if (!busy && !denied && !localInstallRequired && !localWorkspaceRequired) {
-                          void toggle(atlas, !enabled)
+                          void toggle(atlas, next)
                         }
-                      }}>
-                      <span className="dsh-atlas-manager-thumb" />
-                    </button>
+                      }}
+                    />
                   </div>
                 </div>
                 {isExpanded && (
@@ -754,7 +776,11 @@ export function apply(ctx: ClientContext): void {
                 const memberCount = item.members.length > 0 ? item.members.length : settingsEntry?.count
                 const onIconPress = canExpand ? () => toggleExpanded(item.packageName) : undefined
                 return (
-                  <li key={item.packageName} className="dsh-atlas-manager-row">
+                  <li
+                    key={item.packageName}
+                    className="dsh-atlas-manager-row"
+                    data-atlas-state={item.enabled ? 'on' : 'off'}
+                  >
                     <div className="dsh-atlas-manager-row-main">
                       <BundleRowIcon
                         src={ATLAS_ICONS.plugin}

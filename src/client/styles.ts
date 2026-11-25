@@ -1,10 +1,21 @@
-// Switch and thumb adapted from @deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5,
-// src/Switch.tsx and src/Switch.module.css. See THIRD-PARTY-NOTICES.md.
+// Inward chevron icon mirrors IconChevronsUpDownOutlineMedium from @deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5.
+// Danger button overrides follow .danger in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5. See THIRD-PARTY-NOTICES.md.
 export const CSS = `
+.dsh-atlas-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .dsh-atlas-manager-repositories {
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 .dsh-atlas-manager-repository-row {
   display: grid;
@@ -30,40 +41,45 @@ export const CSS = `
 .dsh-atlas-manager-heading-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 4px;
+  margin: 18px 0 6px;
 }
 .dsh-atlas-manager-heading {
   margin: 0;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--dsw-alias-label-primary);
 }
 .dsh-atlas-expand-all {
-  padding: 3px 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
   cursor: pointer;
 }
 @media (hover: hover) {
-  .dsh-atlas-expand-all:hover {
+  .dsh-atlas-expand-all:hover,
+  .dsh-atlas-expand-all[aria-pressed='true'] {
     color: var(--dsw-alias-label-primary);
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }
 .dsh-atlas-manager-subheading {
-  margin: 14px 0 4px;
+  margin: 18px 0 6px;
   font-size: 13px;
   line-height: 18px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--dsw-alias-label-secondary);
 }
 .dsh-atlas-manager-list {
@@ -76,12 +92,12 @@ export const CSS = `
   display: grid;
   gap: 0;
   padding: 10px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
 }
 .dsh-atlas-manager-row:last-child { border-bottom: 0; }
 .dsh-atlas-manager-row-main {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
 }
@@ -89,20 +105,32 @@ export const CSS = `
   box-sizing: border-box;
   display: grid;
   place-items: center;
-  align-self: start;
-  width: 40px;
-  height: 40px;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-md);
+  align-self: center;
+  width: 36px;
+  height: 36px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent);
+  transition: opacity 120ms ease, border-color 120ms ease, background-color 120ms ease;
 }
-.dsh-atlas-manager-icon > img { object-fit: contain; }
+.dsh-atlas-manager-icon > img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
 .dsh-atlas-manager-icon-btn {
   padding: 0;
-  background: transparent;
   cursor: pointer;
   font: inherit;
 }
-.dsh-atlas-manager-copy { min-width: 0; }
+.dsh-atlas-manager-copy {
+  min-width: 0;
+  transition: opacity 120ms ease;
+}
+.dsh-atlas-manager-row[data-atlas-state='off'] .dsh-atlas-manager-icon,
+.dsh-atlas-manager-row[data-atlas-state='off'] .dsh-atlas-manager-copy {
+  opacity: 0.56;
+}
 .dsh-atlas-manager-label {
   display: flex;
   flex-wrap: wrap;
@@ -110,13 +138,18 @@ export const CSS = `
   gap: 6px;
   font-size: 14px;
   line-height: 20px;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
   overflow-wrap: anywhere;
 }
 @media (hover: hover) {
   .dsh-atlas-manager-icon-btn:hover {
-    border-color: var(--dsw-alias-border-l2);
+    border-color: var(--dsw-alias-border-l1);
     background: var(--dsw-alias-interactive-bg-hover);
+  }
+  .dsh-atlas-manager-row[data-atlas-state='off']:hover .dsh-atlas-manager-icon,
+  .dsh-atlas-manager-row[data-atlas-state='off']:hover .dsh-atlas-manager-copy {
+    opacity: 1;
   }
 }
 .dsh-atlas-manager-tags {
@@ -172,10 +205,17 @@ export const CSS = `
   cursor: pointer;
 }
 .dsh-atlas-section-count {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
   line-height: 18px;
-  font-weight: 400;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-secondary);
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent);
 }
 .dsh-atlas-chevron {
   flex-shrink: 0;
@@ -190,6 +230,8 @@ export const CSS = `
   box-sizing: border-box;
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  min-height: 24px;
   display: inline-grid;
   place-items: center;
   padding: 0;
@@ -197,36 +239,44 @@ export const CSS = `
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
+  opacity: 0.55;
   cursor: pointer;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
 }
 @media (hover: hover) {
   .dsh-atlas-settings-toggle:hover {
     background: var(--dsw-alias-interactive-bg-hover);
   }
+  .dsh-atlas-manager-row:hover .dsh-atlas-detail-open {
+    opacity: 0.9;
+  }
   .dsh-atlas-detail-open:hover {
+    opacity: 1;
     color: var(--dsw-alias-brand-primary);
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }
+.dsh-atlas-detail-open:focus-visible {
+  opacity: 1;
+}
 .dsh-atlas-settings-body {
-  margin-top: 10px;
-  margin-left: 20px;
-  padding-left: 20px;
-  border-left: 1px solid var(--dsw-alias-border-l2);
+  margin: 6px 0 4px 17px;
+  padding: 2px 0 2px 18px;
+  border-left: 1.5px solid var(--dsw-alias-border-l2);
   min-width: 0;
 }
 @media (max-width: 520px) {
   .dsh-atlas-settings-body {
-    margin-left: 10px;
+    margin-left: 8px;
     padding-left: 12px;
   }
 }
 .dsh-atlas-manager-status {
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--dsw-alias-label-tertiary);
   overflow-wrap: anywhere;
-  margin: 2px 0 0;
+  margin: 3px 0 0;
 }
 .dsh-atlas-manager-status[data-error] { color: var(--dsw-alias-state-error-primary); }
 .dsh-atlas-manager-detail { margin-top: 4px; }
@@ -243,12 +293,11 @@ export const CSS = `
   cursor: pointer;
 }
 .dsh-atlas-manager-control {
-  display: grid;
-  grid-template-columns: 14px 28px 36px;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex: none;
 }
-.dsh-atlas-manager-control > .dsh-atlas-manager-switch { grid-column: 3; }
 /* Danger outline follows .danger in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5,
    src/client/PluginManagerPage.module.css. See THIRD-PARTY-NOTICES.md. */
 .dsh-atlas-manager-danger,
@@ -260,16 +309,17 @@ export const CSS = `
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
 }
 .dsh-atlas-manager-trash {
-  grid-column: 2;
   box-sizing: border-box;
   width: 28px;
   height: 28px;
-  display: grid;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-grid;
   place-items: center;
   padding: 0;
-  border-width: 1px;
+  border-width: 0.5px;
   border-style: solid;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: var(--dsw-radius-sm, 8px);
   background: transparent;
   cursor: pointer;
 }
@@ -299,42 +349,12 @@ export const CSS = `
   animation: dsh-atlas-manager-spin 700ms linear infinite;
 }
 @keyframes dsh-atlas-manager-spin { to { transform: rotate(1turn); } }
-.dsh-atlas-manager-switch {
-  box-sizing: border-box;
-  grid-column: 2;
-  width: 36px;
-  height: 20px;
-  padding: 2px;
-  border: 0;
-  border-radius: 999px;
-  corner-shape: round;
-  background: var(--dsw-alias-border-l3);
-  cursor: pointer;
-}
-.dsh-atlas-manager-switch[aria-checked='true'] { background: var(--dsw-alias-brand-primary); }
-.dsh-atlas-manager-switch[aria-checked='false'] {
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-label-secondary);
-}
-.dsh-atlas-manager-switch[aria-disabled='true'] { cursor: default; opacity: 0.55; }
-.dsh-atlas-manager-switch:focus-visible, .dsh-atlas-manager-retry:focus-visible,
+.dsh-atlas-manager-retry:focus-visible,
 .dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible,
 .dsh-atlas-local-btn:focus-visible,
 .dsh-atlas-settings-toggle:focus-visible, .dsh-atlas-detail-open:focus-visible, .dsh-atlas-expand-all:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: 2px;
-}
-.dsh-atlas-manager-thumb {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  corner-shape: round;
-  background: var(--dsw-alias-switch-thumb);
-  transition: transform 120ms ease;
-}
-.dsh-atlas-manager-switch[aria-checked='true'] .dsh-atlas-manager-thumb {
-  background: var(--dsw-alias-label-primary-foreground);
-  transform: translateX(16px);
 }
 .dsh-atlas-local-detail {
   display: grid;
@@ -379,7 +399,9 @@ export const CSS = `
   color: var(--dsw-alias-label-secondary);
 }
 @media (prefers-reduced-motion: reduce) {
-  .dsh-atlas-manager-thumb { transition: none; }
+  .dsh-atlas-manager-icon,
+  .dsh-atlas-manager-copy,
+  .dsh-atlas-detail-open { transition: none; }
   .dsh-atlas-manager-spinner { animation: none; }
   .dsh-atlas-chevron { transition: none; }
 }

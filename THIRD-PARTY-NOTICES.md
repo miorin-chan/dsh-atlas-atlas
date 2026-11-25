@@ -1,7 +1,8 @@
 # Third-party notices
 
-Atlas manager adapts the switch markup and styling from `@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5`,
-`src/Switch.tsx` (`Switch`) and `src/Switch.module.css` (`switch` and `thumb`).
+Atlas manager uses `@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5` components (`Button`, `Switch`,
+`Tooltip`) and adapts the inward-chevron mirror icon from `IconChevronsUpDownOutlineMedium` (`src/icons/artwork.ts`,
+`'chevrons-up-down-outline'`).
 The uninstall button follows the danger outline styling in `@deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5`,
 `src/client/PluginManagerPage.module.css` (`.danger`).
 

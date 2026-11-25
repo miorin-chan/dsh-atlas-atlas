@@ -20,11 +20,13 @@ function SwitchStub({
   onChange,
   label,
   disabled,
+  className,
 }: {
   checked: boolean
   onChange: (next: boolean) => void
   label: string
   disabled?: boolean
+  className?: string
 }) {
   return createElement('button', {
     type: 'button',
@@ -32,10 +34,27 @@ function SwitchStub({
     'aria-label': label,
     'aria-checked': checked,
     disabled,
+    className,
     onClick: () => { if (!disabled) onChange(!checked) },
   })
 }
-const plugin = registration.factory(id => testRequire(id))
+const testPrimitivesStub = {
+  Button: ({
+    icon,
+    children,
+    variant: _variant,
+    size: _size,
+    ...rest
+  }: Record<string, unknown>) => createElement('button', { type: 'button', ...rest }, icon as never, children as never),
+  IconChevronRightOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
+  IconChevronsUpDownOutlineMedium: (props: Record<string, unknown>) => createElement('svg', props),
+  IconRightUpOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
+  IconTrashOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
+  PluginArtworkSubagent: () => null,
+  Switch: SwitchStub,
+  Tooltip: ({ children }: { children: unknown }) => children,
+}
+const plugin = registration.factory(id => id === '@deepseek-ai/dsh-client-ui-primitives' ? testPrimitivesStub : testRequire(id))
 
 test('mounts bundle config, detail badge, and detail section slots and disposes cleanly', () => {
   const effects = []
@@ -223,7 +242,8 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
     await act(async () => {
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
     })
-    const switches = view.root.findAllByProps({ role: 'switch' })
+    const bundlesList = view.root.findByProps({ 'data-atlas-panel': 'bundles' })
+    const switches = bundlesList.findAllByProps({ role: 'switch' })
     assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity', 'visual'])
     const continuitySwitch = switches.find(item => item.props['aria-label'] === 'continuity')
     assert.equal(continuitySwitch?.props.disabled, true)
@@ -575,17 +595,22 @@ test('expands indented aggregate settings inline under bundle title subheadings 
       { name: 'dsh-aggregate.config:@miorin/dsh-atlas-visual', inputProps: { view: 'page', canToggle: true } },
     ])
 
-    // Expand-all button above bundles expands every expandable bundle and passes expandCommand.
+    // Expand-all icon button above bundles expands every expandable bundle and passes expandCommand.
     const expandAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
-    assert.deepEqual(expandAllBtn.children, ['expandAll'])
+    assert.equal(expandAllBtn.props['aria-label'], 'expandAll')
+    assert.equal(expandAllBtn.props['aria-pressed'], false)
     await act(async () => { expandAllBtn.props.onClick() })
-    assert.deepEqual(view!.root.findByProps({ 'data-atlas-expand-all': '' }).children, ['collapseAll'])
+    const collapseAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
+    assert.equal(collapseAllBtn.props['aria-label'], 'collapseAll')
+    assert.equal(collapseAllBtn.props['aria-pressed'], true)
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }))
     assert.deepEqual(factoryCalls.slice(-1)[0]?.inputProps.expandCommand, { action: 'expand', seq: 1 })
     await act(async () => { view!.root.findByProps({ 'data-atlas-expand-all': '' }).props.onClick() })
-    assert.deepEqual(view!.root.findByProps({ 'data-atlas-expand-all': '' }).children, ['expandAll'])
+    const resetExpandBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
+    assert.equal(resetExpandBtn.props['aria-label'], 'expandAll')
+    assert.equal(resetExpandBtn.props['aria-pressed'], false)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }).length, 0)
@@ -762,15 +787,11 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     console,
   })
   assert.equal(listEntry?.id, '@miorin/dsh-atlas-list')
-  const primitivesStub = {
-    Switch: SwitchStub,
-    PluginArtworkSubagent: () => null,
-  }
   const listPlugin = listEntry!.factory(id =>
     id === 'react'
       ? ReactNamespace
       : id === '@deepseek-ai/dsh-client-ui-primitives'
-        ? primitivesStub
+        ? testPrimitivesStub
         : appRequire(id),
   )
   const listFork = ctx.plugin({
