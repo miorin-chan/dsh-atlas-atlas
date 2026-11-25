@@ -67,6 +67,8 @@ test('mounts bundle config, detail badge, and detail section slots and disposes 
   for (const [language, localized] of Object.entries(labels)) {
     assert.deepEqual(Object.keys(localized).sort(), Object.keys(labels.en).sort())
     assert.equal(localized.list, listTitles[language], language)
+    const visualLocale = JSON.parse(readFileSync(new URL(`../../dsh-atlas-visual/locale/${language}.json`, import.meta.url), 'utf8'))
+    assert.equal(localized.visual, visualLocale.meta.title, language)
     const { meta } = JSON.parse(readFileSync(new URL(`../locale/${language}.json`, import.meta.url), 'utf8'))
     if (language === 'zh') {
       assert.equal(meta.title, '模块模块化改良计划')
@@ -84,7 +86,7 @@ test('mounts bundle config, detail badge, and detail section slots and disposes 
   assert.equal(subscriptions.size, 0)
 })
 
-test('renders six Atlas switches, discovered aggregates, and gates detail controls on localDevEnabled', async () => {
+test('renders seven Atlas switches, discovered aggregates, and gates detail controls on localDevEnabled', async () => {
   const effects = []
   const mutations = []
   const fetchRequests = []
@@ -197,9 +199,11 @@ test('renders six Atlas switches, discovered aggregates, and gates detail contro
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
     })
     const switches = view.root.findAllByProps({ role: 'switch' })
-    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity'])
+    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity', 'visual'])
     const continuitySwitch = switches.find(item => item.props['aria-label'] === 'continuity')
     assert.equal(continuitySwitch?.props.disabled, true)
+    const visualSwitch = switches.find(item => item.props['aria-label'] === 'visual')
+    assert.equal(visualSwitch?.props.disabled, true)
     assert.equal(view.root.findAllByProps({ 'data-discovered-aggregates': '' }).length, 1)
 
     // When localDevEnabled is false, detail contributions render null with zero detail requests.

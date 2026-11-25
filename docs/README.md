@@ -1,6 +1,6 @@
 # 模块模块化改良计划开发与验证
 
-[使用说明](../README.zh.md)介绍管理卡的安装和六个开关。
+[使用说明](../README.zh.md)介绍管理卡的安装和七个开关。
 
 ## 命名与本地化
 
@@ -11,15 +11,15 @@
 
 ## 行为
 
-管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、脉络的顺序渲染六个开关，
-并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
+管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、脉络、
+外观的顺序渲染七个开关，并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
 
 开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，
-保存实际安装的精确版本；脉络作为本地成员在此模式下仅显示本地安装提示，不尝试请求 npm。
-开启「启用本地仓库链接」并保存有效的 `localWorkspaceDir` 后，
-开启尚未安装的成员包（含脉络）直接校验并安装 `link:<localWorkspaceDir>/dsh-atlas-<atlas>`，
-不回退到 npm（未保存有效目录时拦截并提示配置）；对已安装的成员包做启停切换则始终保留当前安装来源。
+保存实际安装的精确版本；脉络和外观作为本地成员在此模式下仅显示本地安装提示，不尝试请求 npm。
+开启「启用本地仓库链接」并保存有效的 `localWorkspaceDir` 后，开启尚未安装的成员包（含脉络、
+外观）直接校验并安装 `link:<localWorkspaceDir>/dsh-atlas-<atlas>`，不回退到 npm（未保存有效目录时拦截并提示配置）；
+对已安装的成员包做启停切换则始终保留当前安装来源。
 安装后先读取目标 bundle，检查行 ID 是否已由其他启用的 bundle 定义，再保存启用状态。
 若启用在保存选择后失败，管理卡尝试恢复停用状态并报告结果。
 默认与本地模式下，再次开启和关闭已安装成员都直接调用 `setBundleEnabled`，复用已有安装与逐项设置。
@@ -49,7 +49,7 @@ Host 在 `Config` 中维护 `localDevEnabled`（默认 `false`）和 `localWorks
 [图标清单](../src/client/published-icons.ts) 记录包名、版本和资源路径。
 列表图标取自本地 List Atlas 源码，对应计划发布的 npm `0.1.0`。
 `npm pack` 在打包前执行 `npm run sync:atlas-icons`，从可通过 npm 安装的成员包的 `latest` 版本读取图标，再构建客户端。
-本地成员跳过 npm 查询。脉络的嵌入图标记录在[本地图标清单](../src/client/local-icons.ts)。
+本地成员跳过 npm 查询。本地成员的嵌入图标记录在[本地图标清单](../src/client/local-icons.ts)。
 列表包发布后即可执行这一步。
 
 ## 本地安装与开发检查
@@ -68,7 +68,7 @@ npm run check
 `npm test` 会先构建再运行测试。`npm run check` 读取现有产物并核对它们与源码是否一致。
 
 从工作区运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
-测试覆盖 npm 首次安装、本地链接、脉络未安装时不发起 npm 请求、已有安装复用，
+测试覆盖 npm 首次安装、本地链接、本地成员未安装时不发起 npm 请求、已有安装复用，
 以及包文件缺失、并行安装、行 ID 冲突和启用失败后的状态。
 客户端测试核对插槽注册和释放、开关顺序、八语标题与本地安装提示。
 开关适配的官方代码版本和许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)。

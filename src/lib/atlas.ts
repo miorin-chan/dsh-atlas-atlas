@@ -8,10 +8,11 @@ export const ATLAS_BUNDLES = {
   plugin: '@miorin/dsh-atlas-plugin',
   mobile: '@miorin/dsh-atlas-mobile',
   continuity: '@miorin/dsh-atlas-continuity',
+  visual: '@miorin/dsh-atlas-visual',
 } as const
 
 export type Atlas = keyof typeof ATLAS_BUNDLES
-export const LOCAL_ONLY_ATLASES = ['continuity'] as const satisfies readonly Atlas[]
+export const LOCAL_ONLY_ATLASES = ['continuity', 'visual'] as const satisfies readonly Atlas[]
 export type LocalAtlas = typeof LOCAL_ONLY_ATLASES[number]
 
 export function isLocalOnlyAtlas(atlas: Atlas): atlas is LocalAtlas {
@@ -42,9 +43,13 @@ export function normalizeWorkspaceDir(input: string | undefined): string | undef
   return trimmed.replace(/[\\/]+$/, '') || '/'
 }
 
-export function localAtlasSpec(workspaceDir: string, atlas: Atlas): string {
+export function localAtlasDir(atlas: Atlas): string {
   const name = ATLAS_BUNDLES[atlas]
-  const basename = name.includes('/') ? name.slice(name.indexOf('/') + 1) : name
+  return name.includes('/') ? name.slice(name.indexOf('/') + 1) : name
+}
+
+export function localAtlasSpec(workspaceDir: string, atlas: Atlas): string {
+  const basename = localAtlasDir(atlas)
   const sep = workspaceDir.includes('\\') && !workspaceDir.includes('/') ? '\\' : '/'
   const base = workspaceDir.endsWith('/') || workspaceDir.endsWith('\\') ? workspaceDir : `${workspaceDir}${sep}`
   return `link:${base}${basename}`

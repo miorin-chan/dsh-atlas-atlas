@@ -15,6 +15,7 @@ import {
   canUninstallAtlas,
   ENTRY_ID,
   isLocalOnlyAtlas,
+  localAtlasDir,
   normalizeWorkspaceDir,
   PACKAGE,
   setAtlasEnabled,
@@ -159,11 +160,15 @@ export function apply(ctx: ClientContext): void {
   const subscribeLocale = (listener: () => void) => ctx.locale.subscribe(listener)
   const localeSnapshot = () => ctx.locale.getSnapshot()
 
-  function NoticeLine({ notice }: { notice: Notice }) {
+  function NoticeLine({ atlas, notice }: { atlas: Atlas; notice: Notice }) {
     const { kind } = notice
     const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'localWorkspaceRequired'
       || kind === 'conflict' || kind === 'continuityConflict' || kind === 'uninstallUnavailable'
-    const message = notice.kind === 'conflict' ? t('conflict', { bundle: notice.bundle, row: notice.row }) : t(kind)
+    const message = notice.kind === 'conflict'
+      ? t('conflict', { bundle: notice.bundle, row: notice.row })
+      : notice.kind === 'localInstallRequired'
+        ? t('localInstallRequired', { dir: localAtlasDir(atlas) })
+        : t(kind)
     return <p className="dsh-atlas-manager-status" data-atlas-status={kind} data-error={error ? '' : undefined}>{message}</p>
   }
 
@@ -300,7 +305,7 @@ export function apply(ctx: ClientContext): void {
             if (notice?.kind !== 'uninstallFailed' && notice?.kind !== 'uninstallUnavailable') return null
             return <div key={atlas}>
               <div className="dsh-atlas-manager-label">{t(atlas)}</div>
-              <NoticeLine notice={notice} />
+              <NoticeLine atlas={atlas} notice={notice} />
               {'detail' in notice && notice.detail && <code className="dsh-atlas-manager-status">{notice.detail}</code>}
             </div>
           })}
@@ -471,9 +476,9 @@ export function apply(ctx: ClientContext): void {
                       data-error={status === 'bundleError' ? '' : undefined}>{t(status)}</p>
                     {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
                     {atlas === 'continuity' && <p className="dsh-atlas-manager-status">{t('continuityMembers')}</p>}
-                    {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired')}</p>}
+                    {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired', { dir: localAtlasDir(atlas) })}</p>}
                     {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
-                    {notice && <NoticeLine notice={notice} />}
+                    {notice && <NoticeLine atlas={atlas} notice={notice} />}
                   </div>
                   {localDevEnabled && localStatus && (
                     <LocalDevControls
