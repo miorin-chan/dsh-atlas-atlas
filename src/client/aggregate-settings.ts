@@ -31,14 +31,13 @@ export function inspectAggregateSettings(
     (node): node is LiveFactoryNode => node.type === 'factory' && node.name === factoryName,
   )
   if (factoryNode === undefined) return undefined
-  if (factoryNode.children.length === 0) return { factoryName }
   let count = 0
   for (const child of factoryNode.children) {
     for (const occupant of child.occupants) {
       if (occupant.active) count += 1
     }
   }
-  return count > 0 ? { factoryName, count } : undefined
+  return count > 0 ? { factoryName, count } : { factoryName }
 }
 
 export function readAggregateSettingsMap(
@@ -106,7 +105,7 @@ export function useAggregateSettingsMap(
 export function renderDynamicFactorySlot(
   renderFactorySlot: RenderFactorySlot,
   factoryName: string,
-  inputProps: { readonly view: 'summary' | 'page' },
+  inputProps: { readonly view: 'summary' | 'page'; readonly canToggle?: boolean },
 ): ReactNode {
   return (renderFactorySlot as unknown as (name: string, props: Record<string, unknown>) => ReactNode)(
     factoryName,

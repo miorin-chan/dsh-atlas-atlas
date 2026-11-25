@@ -314,35 +314,10 @@ export function apply(ctx: ClientContext): void {
     )
   }
 
-  function BundleRowTitle({
-    packageName,
-    displayName,
-    canOpen,
-    onOpen,
-  }: {
-    packageName: string
-    displayName: string
-    canOpen: boolean
-    onOpen: (packageName: string) => void
-  }) {
-    if (!canOpen) return <span>{displayName}</span>
-    return (
-      <button
-        type="button"
-        className="dsh-atlas-manager-link"
-        data-atlas-open={packageName}
-        title={t('openBundleDetails', { name: displayName })}
-        onClick={() => onOpen(packageName)}
-      >
-        <span>{displayName}</span>
-        <ChevronArrow className="dsh-atlas-manager-link-arrow" />
-      </button>
-    )
-  }
-
   function AtlasPanel({ useRemoteAccess, renderFactorySlot }: PanelProps) {
     const canList = useRemoteAccess('pluginManager/listBundles')
     const canToggle = useRemoteAccess('pluginManager/setBundleEnabled')
+    const canToggleMembers = useRemoteAccess('pluginManager/setPluginEnabled')
     const canInstall = useRemoteAccess('pluginManager/installBundle')
     const canInspect = useRemoteAccess('pluginManager/inspect')
     const canRemove = useRemoteAccess('pluginManager/removeBundle')
@@ -498,27 +473,27 @@ export function apply(ctx: ClientContext): void {
       })
     }
 
+    const countBundleMembers = (bundle: BundleInfo | undefined, fallbackCount?: number): number | undefined => {
+      if (bundle !== undefined) {
+        const count = bundle.rows.filter(
+          row => row.moduleName !== bundle.name && !row.moduleName.startsWith(`${bundle.name}/`),
+        ).length
+        if (count > 0) return count
+      }
+      return fallbackCount
+    }
+
     const renderBundleHeading = (
       packageName: string,
       displayName: string,
-      canExpandSettings: boolean,
+      canExpand: boolean,
       isExpanded: boolean,
-      settingsCount: number | undefined,
+      memberCount: number | undefined,
       settingsBodyId: string,
       canOpenBundle: boolean,
-    ) => {
-      if (!canExpandSettings) {
-        return (
-          <BundleRowTitle
-            packageName={packageName}
-            displayName={displayName}
-            canOpen={canOpenBundle}
-            onOpen={openBundle}
-          />
-        )
-      }
-      return (
-        <>
+    ) => (
+      <>
+        {canExpand ? (
           <button
             type="button"
             className="dsh-atlas-settings-toggle"
@@ -529,23 +504,25 @@ export function apply(ctx: ClientContext): void {
           >
             <ChevronArrow className="dsh-atlas-chevron" />
             <span>{displayName}</span>
-            {typeof settingsCount === 'number' && <span className="dsh-atlas-section-count">{settingsCount}</span>}
+            {typeof memberCount === 'number' && <span className="dsh-atlas-section-count">{memberCount}</span>}
           </button>
-          {canOpenBundle && (
-            <button
-              type="button"
-              className="dsh-atlas-detail-open"
-              data-atlas-open={packageName}
-              title={t('openBundleDetails', { name: displayName })}
-              aria-label={t('openBundleDetails', { name: displayName })}
-              onClick={() => openBundle(packageName)}
-            >
-              <OpenDetailsIcon />
-            </button>
-          )}
-        </>
-      )
-    }
+        ) : (
+          <span>{displayName}</span>
+        )}
+        {canOpenBundle && (
+          <button
+            type="button"
+            className="dsh-atlas-detail-open"
+            data-atlas-open={packageName}
+            title={t('openBundleDetails', { name: displayName })}
+            aria-label={t('openBundleDetails', { name: displayName })}
+            onClick={() => openBundle(packageName)}
+          >
+            <OpenDetailsIcon />
+          </button>
+        )}
+      </>
+    )
 
     return (
       <div data-atlas-manager="">
@@ -623,14 +600,11 @@ export function apply(ctx: ClientContext): void {
             const settingsEntry = enabled && typeof renderFactorySlot === 'function'
               ? settingsByPackage.get(packageName)
               : undefined
-            const canExpandSettings = settingsEntry !== undefined
-            const isExpanded = canExpandSettings && Boolean(expandedBundles[packageName])
+            const canExpand = settingsEntry !== undefined
+            const isExpanded = canExpand && Boolean(expandedBundles[packageName])
             const settingsBodyId = `${statusId}-settings`
-            const onIconPress = canExpandSettings
-              ? () => toggleExpanded(packageName)
-              : canOpenBundle
-                ? () => openBundle(packageName)
-                : undefined
+            const memberCount = countBundleMembers(bundle, settingsEntry?.count)
+            const onIconPress = canExpand ? () => toggleExpanded(packageName) : undefined
             return (
               <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
                 <div className="dsh-atlas-manager-row-main">
@@ -645,9 +619,9 @@ export function apply(ctx: ClientContext): void {
                       {renderBundleHeading(
                         packageName,
                         t(atlas),
-                        canExpandSettings,
+                        canExpand,
                         isExpanded,
-                        settingsEntry?.count,
+                        memberCount,
                         settingsBodyId,
                         canOpenBundle,
                       )}
@@ -711,7 +685,10 @@ export function apply(ctx: ClientContext): void {
                 </div>
                 {isExpanded && (
                   <div id={settingsBodyId} className="dsh-atlas-settings-body" data-atlas-settings-body={packageName}>
-                    {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, { view: 'page' })}
+                    {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, {
+                      view: 'page',
+                      canToggle: canToggleMembers,
+                    })}
                   </div>
                 )}
               </li>
@@ -729,14 +706,11 @@ export function apply(ctx: ClientContext): void {
                 const settingsEntry = item.enabled && typeof renderFactorySlot === 'function'
                   ? settingsByPackage.get(item.packageName)
                   : undefined
-                const canExpandSettings = settingsEntry !== undefined
-                const isExpanded = canExpandSettings && Boolean(expandedBundles[item.packageName])
+                const canExpand = settingsEntry !== undefined
+                const isExpanded = canExpand && Boolean(expandedBundles[item.packageName])
                 const settingsBodyId = `${listId}-discovered-${index}-settings`
-                const onIconPress = canExpandSettings
-                  ? () => toggleExpanded(item.packageName)
-                  : canOpenBundle
-                    ? () => openBundle(item.packageName)
-                    : undefined
+                const memberCount = item.members.length > 0 ? item.members.length : settingsEntry?.count
+                const onIconPress = canExpand ? () => toggleExpanded(item.packageName) : undefined
                 return (
                   <li key={item.packageName} className="dsh-atlas-manager-row">
                     <div className="dsh-atlas-manager-row-main">
@@ -750,9 +724,9 @@ export function apply(ctx: ClientContext): void {
                           {renderBundleHeading(
                             item.packageName,
                             item.packageName,
-                            canExpandSettings,
+                            canExpand,
                             isExpanded,
-                            settingsEntry?.count,
+                            memberCount,
                             settingsBodyId,
                             canOpenBundle,
                           )}
@@ -785,7 +759,10 @@ export function apply(ctx: ClientContext): void {
                     </div>
                     {isExpanded && (
                       <div id={settingsBodyId} className="dsh-atlas-settings-body" data-atlas-settings-body={item.packageName}>
-                        {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, { view: 'page' })}
+                        {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, {
+                          view: 'page',
+                          canToggle: canToggleMembers,
+                        })}
                       </div>
                     )}
                   </li>

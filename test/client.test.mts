@@ -401,6 +401,7 @@ test('expands indented aggregate settings inline under bundle title subheadings 
   }
 
   setFactory('@miorin/dsh-atlas-visual', [1, 1])
+  setFactory('@miorin/dsh-atlas-workspace', [])
   setFactory('@miorin/dsh-atlas-session', [1])
   setFactory('@local/custom-bundle', [1])
 
@@ -465,7 +466,31 @@ test('expands indented aggregate settings inline under bundle title subheadings 
           return {
             ok: true,
             value: [
-              { name: '@miorin/dsh-atlas-visual', installed: true, availability: 'profile', enabled: true, removable: true, rows: [] },
+              {
+                name: '@miorin/dsh-atlas-visual',
+                installed: true,
+                availability: 'profile',
+                enabled: true,
+                removable: true,
+                rows: [
+                  { rowId: 'claudelike', moduleName: '@miorin/dsh-claudelike-ui' },
+                  { rowId: 'brand', moduleName: '@miorin/dsh-sidebar-brand' },
+                  { rowId: 'self', moduleName: '@miorin/dsh-atlas-visual/runtime' },
+                ],
+              },
+              {
+                name: '@miorin/dsh-atlas-workspace',
+                installed: true,
+                availability: 'profile',
+                enabled: true,
+                removable: true,
+                rows: [
+                  { rowId: 'w1', moduleName: '@miorin/dsh-workspace-switcher' },
+                  { rowId: 'w2', moduleName: '@miorin/dsh-preview-file-navigation' },
+                  { rowId: 'w3', moduleName: '@miorin/dsh-workspace-title-badge' },
+                  { rowId: 'w4', moduleName: '@miorin/dsh-workspace-default-preset' },
+                ],
+              },
               { name: '@miorin/dsh-atlas-session', installed: true, availability: 'profile', enabled: false, removable: true, rows: [] },
             ],
           }
@@ -517,30 +542,37 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     assert.ok(view!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
     assert.equal(factoryCalls.length, 0)
 
-    // Enabled configurable rows show inline subheading toggles (initially collapsed); non-configurable/disabled rows do not.
+    // Enabled bundles (with or without configurable sub-plugins) show expand-only subheading toggles; disabled rows do not.
     const visualToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' })
+    const workspaceToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-workspace' })
     const customToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@local/custom-bundle' })
     assert.equal(visualToggle.props['aria-expanded'], false)
+    assert.equal(workspaceToggle.props['aria-expanded'], false)
     assert.equal(customToggle.props['aria-expanded'], false)
     assert.ok(visualToggle.findAll(n => n.children?.includes('2')).length > 0)
+    assert.ok(workspaceToggle.findAll(n => n.children?.includes('4')).length > 0)
     assert.ok(customToggle.findAll(n => n.children?.includes('1')).length > 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-session' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
 
-    // Detail link button beside configurable title still opens that bundle's detail page.
+    // Detail link button beside title opens that bundle's detail page; clicking title/icon only expands and never navigates.
     view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' }).props.onClick()
     assert.deepEqual(openedBundles, ['@miorin/dsh-atlas-visual'])
 
-    // Clicking Visual Atlas subheading expands its indented settings inline beneath that row.
+    // Clicking Visual Atlas or Workspace Atlas subheading expands its indented list inline beneath that row without navigating.
     await act(async () => { visualToggle.props.onClick() })
+    await act(async () => { workspaceToggle.props.onClick() })
     assert.equal(
       view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' }).props['aria-expanded'],
       true,
     )
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }))
+    assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }))
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }).length, 0)
-    assert.deepEqual(factoryCalls, [
-      { name: 'dsh-aggregate.config:@miorin/dsh-atlas-visual', inputProps: { view: 'page' } },
+    assert.deepEqual(openedBundles, ['@miorin/dsh-atlas-visual'])
+    assert.deepEqual(factoryCalls.slice(-2), [
+      { name: 'dsh-aggregate.config:@miorin/dsh-atlas-workspace', inputProps: { view: 'page', canToggle: true } },
+      { name: 'dsh-aggregate.config:@miorin/dsh-atlas-visual', inputProps: { view: 'page', canToggle: true } },
     ])
 
     // Expanding Custom Bundle as well renders its indented settings inline beneath its row.
@@ -553,17 +585,18 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     })
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
 
-    // Custom factory without child slot count stays expandable without a numeric badge.
+    // Custom factory with 0 configurable sub-plugins stays expandable via its member count badge.
     await act(async () => {
       setFactory('@local/custom-bundle', [])
       emitSlot('dsh-aggregate.member-config:@local/custom-bundle')
     })
     const updatedCustomToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@local/custom-bundle' })
-    assert.equal(updatedCustomToggle.findAll(n => n.props.className === 'dsh-atlas-section-count').length, 0)
+    assert.ok(updatedCustomToggle.findAll(n => n.children?.includes('1')).length > 0)
 
-    // Drop all member settings -> toggle buttons disappear while bundle rows stay intact.
+    // Drop factories -> toggle buttons disappear while bundle rows stay intact.
     await act(async () => {
       setFactory('@miorin/dsh-atlas-visual', null)
+      setFactory('@miorin/dsh-atlas-workspace', null)
       setFactory('@local/custom-bundle', null)
       emitSlot('dsh-aggregate.member-config:@miorin/dsh-atlas-visual')
     })
@@ -630,6 +663,12 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
           entryId: 'entry-watched',
           meta: { title: { en: 'Watched Sessions', zh: '常驻会话' } },
         },
+        {
+          rowId: 'session-draft',
+          moduleName: '@miorin/dsh-session-draft',
+          entryId: 'entry-draft',
+          meta: { title: { en: 'Session Draft', zh: '草稿标记' } },
+        },
       ],
     },
   ]
@@ -641,6 +680,7 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     subscribe: () => () => {},
     getSnapshot: () => currentLocale,
   }
+  const setPluginEnabledCalls: Array<{ entryId: string; enabled: boolean }> = []
   ctx.reflect.provide('locale', localeService as never)
   ctx.reflect.provide('remote', {
     pluginManager: {
@@ -648,8 +688,15 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
       async listPlugins() {
         return {
           ok: true,
-          value: [{ entryId: 'entry-watched', enabled: true, fiberPhase: 'active' }],
+          value: [
+            { entryId: 'entry-watched', enabled: true, fiberPhase: 'active' },
+            { entryId: 'entry-draft', enabled: false, fiberPhase: null },
+          ],
         }
+      },
+      async setPluginEnabled(entryId: string, enabled: boolean) {
+        setPluginEnabledCalls.push({ entryId, enabled })
+        return { ok: true, value: { application: 'applied' } }
       },
     },
     $on: () => () => {},
@@ -710,7 +757,10 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
         ? primitivesStub
         : appRequire(id),
   )
-  listPlugin.apply(ctx)
+  const listFork = ctx.plugin({
+    name: 'test-dsh-atlas-list',
+    apply: listPlugin.apply,
+  } as never)
   plugin.apply(ctx as never)
 
   const originalFetch = globalThis.fetch
@@ -724,8 +774,7 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
   try {
     await act(async () => {
       renderer = create(ctx.slots.renderSlot('root', {}) as never)
-      await Promise.resolve()
-      await Promise.resolve()
+      for (let i = 0; i < 6; i += 1) await Promise.resolve()
     })
 
     // 1. Standalone aggregate detail page shows ONE single list of sub-plugins with inline expandable settings (no tabs, no second Settings list).
@@ -733,9 +782,11 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-section': 'settings' }).length, 0)
 
     const pluginsPanel = renderer!.root.findByProps({ 'data-dsh-aggregate-panel': 'plugins' })
-    const memberSwitch = pluginsPanel.findByProps({ role: 'switch' })
-    assert.equal(memberSwitch.props['aria-checked'], true)
-    assert.equal(memberSwitch.props.disabled, false)
+    const memberSwitches = pluginsPanel.findAllByProps({ role: 'switch' })
+    assert.equal(memberSwitches.length, 2)
+    assert.equal(memberSwitches[0].props['aria-checked'], false)
+    assert.equal(memberSwitches[1].props['aria-checked'], true)
+    assert.equal(memberSwitches[0].props.disabled, false)
 
     // Soft-fold raw rows style toggles cleanly.
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
@@ -774,8 +825,25 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     assert.equal(listAtlasToggle.props['aria-expanded'], false)
     assert.equal(renderer!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' }).length, 0)
 
-    await act(async () => { listAtlasToggle.props.onClick() })
-    assert.ok(renderer!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' }))
+    await act(async () => {
+      listAtlasToggle.props.onClick()
+      for (let i = 0; i < 6; i += 1) await Promise.resolve()
+    })
+    const body = renderer!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' })
+    const atlasMemberSwitches = body.findAllByProps({ role: 'switch' })
+    assert.equal(atlasMemberSwitches.length, 2)
+    assert.equal(atlasMemberSwitches[0].props['aria-checked'], false)
+    assert.equal(atlasMemberSwitches[1].props['aria-checked'], true)
+
+    // Toggling a non-configurable member switch directly inside dsh-atlas-atlas invokes setPluginEnabled.
+    await act(async () => { atlasMemberSwitches[0].props.onClick() })
+    assert.deepEqual(setPluginEnabledCalls, [{ entryId: 'entry-draft', enabled: true }])
+
+    // Expanding the configurable member inline inside dsh-atlas-atlas renders its settings with data-dsh-aggregate-member.
+    await act(async () => {
+      body.findByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' }).props.onClick()
+    })
+    assert.ok(body.findByProps({ 'data-dsh-aggregate-member': '@miorin/dsh-watched-sessions' }))
     const inlineLeaf = renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' })
     assert.deepEqual(inlineLeaf.children, ['leaf-ns:watchMode=true'])
 
@@ -785,9 +853,21 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
 
-    // 3. Dispose leaf plugin -> factory unregisters, inline toggle disappears cleanly while Bundles list remains.
+    // 3. Dispose leaf plugin -> toggle disappears on watched-sessions, while List Atlas remains expandable for its sub-plugin list & switches.
     await act(async () => {
       disposeLeaf()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    assert.ok(renderer!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-list' }))
+    assert.equal(
+      renderer!.root.findAllByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' }).length,
+      0,
+    )
+
+    // 4. Dispose aggregate bundle -> factory unregisters, inline toggle disappears cleanly while Bundles list remains.
+    await act(async () => {
+      await listFork.dispose()
       await Promise.resolve()
       await Promise.resolve()
     })
@@ -893,27 +973,27 @@ test('navigates to bundle detail pages for installed official and discovered agg
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
     })
 
-    // Installed official Atlases (both enabled and disabled) and installed discovered aggregates are clickable.
-    const visualTitle = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' })
-    const listTitle = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-list' })
-    const customTitle = view!.root.findByProps({ 'data-atlas-open': '@local/custom-bundle' })
+    // Only the trailing jump arrow navigates to bundle details; titles and icons never navigate.
+    const visualOpen = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' })
+    const listOpen = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-list' })
+    const customOpen = view!.root.findByProps({ 'data-atlas-open': '@local/custom-bundle' })
+    assert.equal(visualOpen.props.className, 'dsh-atlas-detail-open')
+    assert.equal(listOpen.props.className, 'dsh-atlas-detail-open')
+    assert.equal(customOpen.props.className, 'dsh-atlas-detail-open')
+    assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-link' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-open': '@miorin/dsh-atlas-workspace' }).length, 0)
+    assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
 
-    const iconButtons = view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' })
-    assert.equal(iconButtons.length, 3)
-
-    visualTitle.props.onClick()
-    listTitle.props.onClick()
-    customTitle.props.onClick()
-    iconButtons[0].props.onClick()
+    visualOpen.props.onClick()
+    listOpen.props.onClick()
+    customOpen.props.onClick()
     assert.deepEqual(openedBundles, [
       '@miorin/dsh-atlas-visual',
       '@miorin/dsh-atlas-list',
       '@local/custom-bundle',
-      '@miorin/dsh-atlas-list',
     ])
 
-    // When pluginNavigation is absent, rows render as static spans without links.
+    // When pluginNavigation is absent, trailing jump arrows disappear cleanly.
     hasNavigation = false
     await act(async () => {
       view!.update(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
