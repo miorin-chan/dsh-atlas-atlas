@@ -135,7 +135,7 @@ export async function setAtlasEnabled(
         const spec = localAtlasSpec(workspaceDir, atlas)
         progress('installing')
         failure = 'localLinkFailed'
-        const inspection = resultValue(await manager.inspect(spec))
+        const inspection = resultValue(await manager.inspect(spec, {}))
         if (inspection.status !== 'accepted' || inspection.kind !== 'path' || inspection.name !== name
           || inspection.bundle !== true || !inspection.version) {
           return { kind: 'localLinkFailed', detail: inspection.status === 'refused' ? inspection.reason : spec }

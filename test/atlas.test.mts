@@ -23,7 +23,9 @@ function fixture(others = []) {
   const writes = []
   const manager = {
     listBundles: async () => success([...profile.values()]),
-    async inspect(spec) {
+    async inspect(spec, options) {
+      assert.equal(arguments.length, 2)
+      assert.deepEqual(options, {})
       writes.push(['inspect', spec])
       if (spec.startsWith('link:')) {
         const parts = spec.slice(5).split(/[\\/]/).filter(Boolean)
@@ -268,7 +270,9 @@ test('blocks enabling uninstalled Atlases without npm fallback when localDevEnab
 
 test('surfaces localLinkFailed without npm fallback when local checkout inspection fails', async () => {
   const { manager, profile, writes } = fixture()
-  manager.inspect = async spec => {
+  manager.inspect = async function (spec, options) {
+    assert.equal(arguments.length, 2)
+    assert.deepEqual(options, {})
     writes.push(['inspect', spec])
     return success({ status: 'refused', reason: 'missing package.json' })
   }
@@ -278,7 +282,9 @@ test('surfaces localLinkFailed without npm fallback when local checkout inspecti
   )
   assert.deepEqual(writes.splice(0), [['inspect', 'link:/repos/dsh-atlas-workspace']])
 
-  manager.inspect = async spec => {
+  manager.inspect = async function (spec, options) {
+    assert.equal(arguments.length, 2)
+    assert.deepEqual(options, {})
     writes.push(['inspect', spec])
     return success({ status: 'accepted', kind: 'registry', name: workspace, version: '0.1.0', bundle: true })
   }

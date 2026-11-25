@@ -265,8 +265,10 @@ test('installs uninstalled Continuity from localWorkspaceDir on toggle in local 
     remote: {
       pluginManager: {
         async listBundles() { return { ok: true, value: [...bundles.values()] } },
-        async inspect(spec: string) {
-          remoteCalls.push({ op: 'inspect', arg: spec })
+        async inspect(spec: string, options: unknown) {
+          assert.equal(arguments.length, 2)
+          assert.deepEqual(options, {})
+          remoteCalls.push({ op: 'inspect', arg: spec, options })
           return { ok: true, value: { status: 'accepted', kind: 'path', name: '@miorin/dsh-atlas-continuity', version: '0.1.0', bundle: true } }
         },
         async installBundle(spec: string, options: unknown) {
@@ -321,7 +323,7 @@ test('installs uninstalled Continuity from localWorkspaceDir on toggle in local 
       continuityReady.props.onClick()
     })
     assert.deepEqual(remoteCalls, [
-      { op: 'inspect', arg: 'link:/repos/dsh-atlas-continuity' },
+      { op: 'inspect', arg: 'link:/repos/dsh-atlas-continuity', options: {} },
       {
         op: 'installBundle',
         arg: 'link:/repos/dsh-atlas-continuity',
