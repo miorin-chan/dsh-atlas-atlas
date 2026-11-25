@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Gestor del plan de mejora modular",
-    "description": "Active el gestor para instalar aquí los cinco paquetes del plan de mejora modular desde npm y activarlos o desactivarlos por separado.",
+    "description": "Instale, active y desactive los paquetes del plan de mejora modular desde una sola página.",
     "detail": "docs/DETAIL.es.md"
   }
 }

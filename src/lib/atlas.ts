@@ -7,9 +7,16 @@ export const ATLAS_BUNDLES = {
   list: '@miorin/dsh-atlas-list',
   plugin: '@miorin/dsh-atlas-plugin',
   mobile: '@miorin/dsh-atlas-mobile',
+  continuity: '@miorin/dsh-atlas-continuity',
 } as const
 
 export type Atlas = keyof typeof ATLAS_BUNDLES
+export const LOCAL_ONLY_ATLASES = ['continuity'] as const satisfies readonly Atlas[]
+export type LocalAtlas = typeof LOCAL_ONLY_ATLASES[number]
+
+export function isLocalOnlyAtlas(atlas: Atlas): atlas is LocalAtlas {
+  return LOCAL_ONLY_ATLASES.some(local => local === atlas)
+}
 export type Manager = Pick<ClientRemote['pluginManager'], 'listBundles' | 'installBundle' | 'setBundleEnabled' | 'inspect' | 'removeBundle'>
 export const ENTRY_ID = 'dsh-atlas-atlas'
 export interface RepositorySettings {
@@ -19,9 +26,10 @@ export interface RepositorySettings {
 export type Progress = 'installing' | 'enabling' | 'disabling' | 'uninstalling'
 export type Failure = 'installFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
 export type Notice =
-  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'uninstallUnavailable' }
+  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'localInstallRequired' | 'uninstallUnavailable' }
   | { kind: Failure | 'localLinkFailed'; detail?: string }
   | { kind: 'conflict'; bundle: string; row: string }
+  | { kind: 'continuityConflict' }
 
 const NPM_REGISTRY = 'https://registry.npmjs.org/'
 
@@ -60,12 +68,16 @@ export async function uninstallAtlas(manager: Manager, atlas: Atlas): Promise<No
   }
 }
 
-function conflict(inventory: readonly BundleInfo[], target: BundleInfo): Notice | undefined {
+function conflict(inventory: readonly BundleInfo[], target: BundleInfo, atlas: Atlas): Notice | undefined {
   const rowIds = new Set(target.rows.map(row => row.rowId))
   for (const other of inventory) {
     if (!other.enabled || other.name === target.name) continue
     const row = other.rows.find(item => rowIds.has(item.rowId))
-    if (row !== undefined) return { kind: 'conflict', bundle: other.name, row: row.rowId }
+    if (row === undefined) continue
+    if (atlas === 'continuity' && (other.name === '@miorin/dsh-vcs-panel' || other.name === '@miorin/dsh-sideby-note')) {
+      return { kind: 'continuityConflict' }
+    }
+    return { kind: 'conflict', bundle: other.name, row: row.rowId }
   }
 }
 
@@ -179,6 +191,7 @@ export async function setAtlasEnabled(
 
     if (enabled && (bundle === undefined || bundle.availability === 'missing')) {
       if (bundle?.installed) return { kind: 'bundleMissing' }
+      if (isLocalOnlyAtlas(atlas)) return { kind: 'localInstallRequired' }
       progress('installing')
       failure = 'installFailed'
       // Install unselected so we can check its declared rows before enabling it.
@@ -202,7 +215,7 @@ export async function setAtlasEnabled(
 
     if (enabled && bundle !== undefined) {
       if (bundle.error !== undefined) return { kind: 'enableFailed', detail: bundle.error.diagnostic || bundle.error.code }
-      const collision = conflict(inventory, bundle)
+      const collision = conflict(inventory, bundle, atlas)
       if (collision !== undefined) return collision
     }
     progress(enabled ? 'enabling' : 'disabling')

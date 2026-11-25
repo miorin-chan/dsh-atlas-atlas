@@ -2,15 +2,18 @@
 
 [简体中文](README.zh.md)
 
-Manage the workspace, session, list, plugin, and mobile bundles for the current profile from one page.
+Manage the workspace, session, list, plugin, mobile, and continuity bundles for the current profile from one page.
 In DeepSeek Harness Web or Desktop, open **Plugins → Add plugin** and enter `@miorin/dsh-atlas-atlas`.
-Open **Plugins → Atlas Modular Improvement Plan** to use the five switches.
+Open **Plugins → Atlas Modular Improvement Plan** to use the six switches.
 
 The manager requires DSH `0.2.2-rc.5` or newer.
 DSH checks each member bundle's version requirements when it installs.
 When you turn on a bundle, the manager reuses the existing installation, including a local link.
 Install [List Atlas](https://github.com/miorin-chan/dsh-atlas-list) from its local checkout before using its switch.
-DSH can install the other bundles from npm.
+Continuity Atlas is local only.
+Prepare the `dsh-atlas-continuity` checkout and add it through Plugins, or use local repository links below.
+Disable any standalone VCS Panel and Sideby Note bundles before enabling Continuity.
+DSH can install published bundles from npm.
 Turning a bundle off keeps the installed copy and its plugin settings.
 
 To use local checkouts, turn on **Use local repository links**,

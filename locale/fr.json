@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Gestionnaire du plan d’amélioration modulaire",
-    "description": "Activez le gestionnaire pour installer ici les cinq bundles du plan d’amélioration modulaire depuis npm et les activer ou les désactiver séparément.",
+    "description": "Installez, activez et désactivez les bundles du plan d’amélioration modulaire depuis une seule page.",
     "detail": "docs/DETAIL.fr.md"
   }
 }

@@ -12,10 +12,11 @@ import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import {
   absoluteRepositoryParent, ATLAS_BUNDLES, canUninstallAtlas, ENTRY_ID, linkAtlas, localAtlasSpec, PACKAGE,
-  setAtlasEnabled, uninstallAtlas,
+  isLocalOnlyAtlas, setAtlasEnabled, uninstallAtlas,
   type Atlas, type Notice, type Progress, type RepositorySettings,
 } from '../lib/atlas.js'
 import { LABELS } from './labels.js'
+import { LOCAL_ICONS } from './local-icons.js'
 import { ATLAS_ICONS } from './published-icons.js'
 import { CSS } from './styles.js'
 
@@ -119,7 +120,7 @@ export function apply(ctx: ClientContext): void {
 
   function NoticeLine({ notice }: { notice: Notice }) {
     const { kind } = notice
-    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'conflict' || kind === 'uninstallUnavailable'
+    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'conflict' || kind === 'continuityConflict' || kind === 'uninstallUnavailable'
     const message = notice.kind === 'conflict' ? t('conflict', { bundle: notice.bundle, row: notice.row }) : t(kind)
     return <p className="dsh-atlas-manager-status" data-atlas-status={kind} data-error={error ? '' : undefined}>{message}</p>
   }
@@ -270,6 +271,7 @@ export function apply(ctx: ClientContext): void {
             const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
             const needsInstall = notInstalled ||
               (local && (bundle.availability === 'missing' || bundle.source !== localAtlasSpec(localParent ?? '', atlas)))
+            const localInstallRequired = notInstalled && !local && isLocalOnlyAtlas(atlas)
             const denied = !canToggle || bundle?.readOnlyReason !== undefined || (!enabled && needsInstall &&
               (!canInstall || settings.status !== 'ready' || (local && (!canInspect || (bundle?.installed && !canRemove)))))
             const showUninstall = canRemove && canUninstallAtlas(bundle)
@@ -283,7 +285,7 @@ export function apply(ctx: ClientContext): void {
               <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
                 {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
                 <span className="dsh-atlas-manager-icon" aria-hidden="true">
-                  <img src={ATLAS_ICONS[atlas]} width={30} height={30} alt="" />
+                  <img src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]} width={30} height={30} alt="" />
                 </span>
                 <div className="dsh-atlas-manager-copy">
                   <div className="dsh-atlas-manager-label">{t(atlas)}</div>
@@ -291,6 +293,8 @@ export function apply(ctx: ClientContext): void {
                     <p className="dsh-atlas-manager-status" data-atlas-status={status}
                       data-error={status === 'bundleError' ? '' : undefined}>{t(status)}</p>
                     {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
+                    {atlas === 'continuity' && <p className="dsh-atlas-manager-status">{t('continuityMembers')}</p>}
+                    {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired')}</p>}
                     {notice && <NoticeLine notice={notice} />}
                   </div>
                   {detail && <details className="dsh-atlas-manager-status dsh-atlas-manager-detail">
@@ -310,10 +314,12 @@ export function apply(ctx: ClientContext): void {
                   </button>}
                   <button type="button" role="switch" className="dsh-atlas-manager-switch"
                     aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
-                    aria-busy={stage !== undefined} aria-disabled={busy || draft !== undefined || denied}
-                    disabled={denied}
+                    aria-busy={stage !== undefined} aria-disabled={busy || draft !== undefined || denied || localInstallRequired}
+                    disabled={denied || localInstallRequired}
                     onClick={() => {
-                      if (!busy && draft === undefined && !denied) void toggle(atlas, !enabled, needsInstall, localParent)
+                      if (!busy && draft === undefined && !denied && !localInstallRequired) {
+                        void toggle(atlas, !enabled, needsInstall, localParent)
+                      }
                     }}>
                     <span className="dsh-atlas-manager-thumb" />
                   </button>

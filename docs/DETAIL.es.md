@@ -1,2 +1,2 @@
-La primera vez que active un paquete, se instalará desde npm.
-Al desactivarlo, seguirá instalado.
+Puede instalar los paquetes publicados desde npm o enlazar repositorios locales.
+Al desactivar un paquete, seguirá instalado.

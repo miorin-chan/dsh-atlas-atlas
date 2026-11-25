@@ -1,2 +1,2 @@
-Turning on a bundle for the first time installs it from npm.
-Turning it off keeps it installed.
+Install available bundles from npm or link local repositories.
+Turning a bundle off keeps it installed.

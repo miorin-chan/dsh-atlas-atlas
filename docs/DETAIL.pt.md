@@ -1,2 +1,2 @@
-Na primeira ativação, o bundle é instalado pelo npm.
-Ele continua instalado após a desativação.
+Instale os bundles publicados pelo npm ou vincule repositórios locais.
+Ao desativar um bundle, ele permanece instalado.

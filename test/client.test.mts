@@ -83,7 +83,7 @@ test('mounts the bundle detail and disposes it, its locale, and both subscriptio
   assert.equal(subscriptions.size, 0)
 })
 
-test('renders five Atlas switches and observes the receiver-bound repository form', async () => {
+test('renders six Atlas switches and observes the receiver-bound repository form', async () => {
   const effects = []
   const form = {
     snapshot: { status: 'ready', writable: true, value: { useLocalRepositories: false, localRepositoryParent: '/repos' } },
@@ -111,7 +111,10 @@ test('renders five Atlas switches and observes the receiver-bound repository for
     assert.ok(Panel)
     await act(async () => { view = create(createElement(Panel, { view: 'page', useRemoteAccess: () => true })) })
     const switches = view.root.findAllByProps({ role: 'switch' })
-    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile'])
+    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity'])
+    const continuitySwitch = switches.find(item => item.props['aria-label'] === 'continuity')
+    assert.equal(continuitySwitch?.props.disabled, true)
+    assert.equal(view.root.findAllByType('p').some(item => item.props.children === 'localInstallRequired'), true)
     const repositorySwitch = switches.find(item => item.props['aria-labelledby'] !== undefined)
     assert.equal(repositorySwitch?.props['aria-checked'], false)
     assert.equal(form.listeners.size, 1)
@@ -121,6 +124,8 @@ test('renders five Atlas switches and observes the receiver-bound repository for
       for (const listener of form.listeners) listener()
     })
     assert.equal(repositorySwitch.props['aria-checked'], true)
+    assert.equal(continuitySwitch?.props.disabled, false)
+    assert.equal(view.root.findAllByType('p').some(item => item.props.children === 'localInstallRequired'), false)
   } finally {
     if (view !== undefined) act(() => view.unmount())
     for (const dispose of effects.reverse()) dispose()

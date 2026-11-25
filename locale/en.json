@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Atlas Modular Improvement Plan",
-    "description": "Enable the manager to install the five Modular Improvement Plan bundles from npm and turn each one on or off here.",
+    "description": "Install and switch Modular Improvement Plan bundles on or off from one page.",
     "detail": "docs/DETAIL.en.md"
   }
 }

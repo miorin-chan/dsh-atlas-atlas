@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ATLAS_BUNDLES, PACKAGE, canUninstallAtlas, linkAtlas, localAtlasSpec, setAtlasEnabled, uninstallAtlas } from '../lib/atlas.js'
+import { ATLAS_BUNDLES, PACKAGE, canUninstallAtlas, isLocalOnlyAtlas, linkAtlas, localAtlasSpec, setAtlasEnabled, uninstallAtlas } from '../lib/atlas.js'
 
 const workspace = ATLAS_BUNDLES.workspace
 const success = value => ({ ok: true, value })
@@ -31,10 +31,11 @@ function fixture(others = []) {
 const ignoreProgress = () => {}
 
 test('installs and enables each missing Atlas from the npm registry and reuses it on the next enable', async () => {
-  assert.deepEqual(Object.keys(ATLAS_BUNDLES), ['workspace', 'session', 'list', 'plugin', 'mobile'])
+  assert.deepEqual(Object.keys(ATLAS_BUNDLES), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity'])
   assert.equal(ATLAS_BUNDLES.list, '@miorin/dsh-atlas-list')
   const { manager, profile, writes } = fixture()
-  for (const [atlas, name] of Object.entries(ATLAS_BUNDLES)) {
+  const registryAtlases = Object.entries(ATLAS_BUNDLES).filter(([atlas]) => !isLocalOnlyAtlas(atlas))
+  for (const [atlas, name] of registryAtlases) {
     const stages = []
     assert.equal(await setAtlasEnabled(manager, atlas, true, stage => stages.push(stage)), undefined)
     assert.deepEqual(stages, ['installing', 'enabling'])
@@ -49,7 +50,37 @@ test('installs and enables each missing Atlas from the npm registry and reuses i
     ])
   }
   assert.equal(profile.get(PACKAGE).enabled, true)
-  assert.ok(Object.values(ATLAS_BUNDLES).every(name => profile.get(name).enabled))
+  assert.ok(registryAtlases.every(([, name]) => profile.get(name).enabled))
+})
+
+test('requires a local copy of Continuity but can toggle an existing link without changing sources', async () => {
+  const name = '@miorin/dsh-atlas-continuity'
+  const { manager, profile, writes } = fixture()
+  assert.equal(ATLAS_BUNDLES.continuity, name)
+  assert.deepEqual(await setAtlasEnabled(manager, 'continuity', true, ignoreProgress), { kind: 'localInstallRequired' })
+  assert.deepEqual(writes, [])
+  const existing = newBundle(name, { source: 'link:/atlas/dsh-atlas-continuity' })
+  profile.set(name, existing)
+  assert.equal(await setAtlasEnabled(manager, 'continuity', true, ignoreProgress), undefined)
+  assert.equal(await setAtlasEnabled(manager, 'continuity', false, ignoreProgress), undefined)
+  assert.equal(profile.get(name).source, existing.source)
+  assert.deepEqual(writes, [['set', name, true], ['set', name, false]])
+})
+
+test('keeps standalone Continuity members untouched until their bundle selections are off', async () => {
+  const continuity = ATLAS_BUNDLES.continuity
+  const rows = [{ rowId: 'dsh-vcs-panel' }, { rowId: 'dsh-sideby-note' }]
+  const standalone = rows.map(row => newBundle(`@miorin/${row.rowId}`, { enabled: true, rows: [row] }))
+  const { manager, profile, writes } = fixture([newBundle(continuity, { rows }), ...standalone])
+  for (const member of standalone) {
+    assert.deepEqual(await setAtlasEnabled(manager, 'continuity', true, ignoreProgress), { kind: 'continuityConflict' })
+    assert.equal(profile.get(member.name), member)
+    assert.equal(profile.get(continuity).enabled, false)
+    assert.deepEqual(writes, [])
+    profile.set(member.name, { ...member, enabled: false })
+  }
+  assert.equal(await setAtlasEnabled(manager, 'continuity', true, ignoreProgress), undefined)
+  assert.deepEqual(writes, [['set', continuity, true]])
 })
 
 test('toggles a locally linked List Atlas without installing from npm', async () => {

@@ -1,2 +1,2 @@
-Beim ersten Einschalten wird das Bundle von npm installiert.
-Beim Ausschalten bleibt es installiert.
+Veröffentlichte Bundles lassen sich über npm installieren, lokale Repositorys lassen sich verlinken.
+Beim Ausschalten bleibt das Bundle installiert.
