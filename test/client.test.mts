@@ -15,39 +15,6 @@ await import('../client.js')
 delete globalThis.window
 assert.equal(registration.id, '@miorin/dsh-atlas-atlas')
 const testRequire = createRequire(import.meta.url)
-function SegmentedTabsStub({
-  items,
-  value,
-  onChange,
-  label,
-  className,
-}: {
-  items: readonly Array<{ value: string; label: unknown; id: string; panelId: string }>
-  value: string
-  onChange: (value: string) => void
-  label: string
-  className?: string
-}) {
-  return createElement(
-    'div',
-    { role: 'tablist', 'aria-label': label, className },
-    items.map(item =>
-      createElement(
-        'button',
-        {
-          key: item.value,
-          type: 'button',
-          role: 'tab',
-          id: item.id,
-          'aria-selected': value === item.value,
-          'aria-controls': item.panelId,
-          onClick: () => { onChange(item.value) },
-        },
-        item.label,
-      ),
-    ),
-  )
-}
 function SwitchStub({
   checked,
   onChange,
@@ -68,11 +35,7 @@ function SwitchStub({
     onClick: () => { if (!disabled) onChange(!checked) },
   })
 }
-const plugin = registration.factory(id =>
-  id === '@deepseek-ai/dsh-client-ui-primitives'
-    ? { SegmentedTabs: SegmentedTabsStub, Switch: SwitchStub }
-    : testRequire(id),
-)
+const plugin = registration.factory(id => testRequire(id))
 
 test('mounts bundle config, detail badge, and detail section slots and disposes cleanly', () => {
   const effects = []
@@ -405,7 +368,7 @@ test('installs uninstalled Continuity from localWorkspaceDir on toggle in local 
   }
 })
 
-test('switches between Bundles and indented Settings tab for enabled aggregates and reacts to member changes', async () => {
+test('renders unified collapsible Bundles and indented Settings sections and reacts to member changes', async () => {
   const effects: Array<() => void> = []
   const subscribers = new Map<string, Set<() => void>>()
   const factories = new Map<string, {
@@ -548,24 +511,16 @@ test('switches between Bundles and indented Settings tab for enabled aggregates 
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true, renderFactorySlot }))
     })
 
-    // Defaults to Bundles tab; no inline expand buttons and no factory render calls yet.
-    assert.equal(factoryCalls.length, 0)
-    assert.ok(view!.root.findByProps({ 'data-atlas-tabs': '' }))
+    // Unified view renders BOTH Bundles and indented Settings sections on one page (no tabs).
+    assert.equal(view!.root.findAllByProps({ role: 'tab' }).length, 0)
+    assert.ok(view!.root.findByProps({ 'data-atlas-section': 'bundles' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
-    assert.equal(view!.root.findAllByProps({ 'data-atlas-panel': 'settings' }).length, 0)
+    assert.ok(view!.root.findByProps({ 'data-atlas-section': 'settings' }))
 
-    const tabs = view!.root.findAllByProps({ role: 'tab' })
-    assert.equal(tabs.length, 2)
-    assert.equal(tabs[0].props['aria-selected'], true)
-    assert.ok(tabs[0].findAll(n => n.children?.includes('tabBundles')).length > 0)
-    assert.equal(tabs[1].props['aria-selected'], false)
-    assert.ok(tabs[1].findAll(n => n.children?.includes('bundleSettings:3')).length > 0)
+    const settingsToggle = view!.root.findByProps({ 'data-atlas-section-toggle': 'settings' })
+    assert.equal(settingsToggle.props['aria-expanded'], true)
+    assert.ok(settingsToggle.findAll(n => n.children?.includes('3')).length > 0)
 
-    // Switch to Settings tab -> indented grouped sections render in canonical order.
-    await act(async () => {
-      tabs[1].props.onClick()
-    })
-    assert.equal(view!.root.findAllByProps({ 'data-atlas-panel': 'bundles' }).length, 0)
     const settingsPanel = view!.root.findByProps({ 'data-atlas-panel': 'settings' })
     const groups = settingsPanel.findAll(n => typeof n.props['data-atlas-settings-group'] === 'string')
     assert.deepEqual(
@@ -573,30 +528,63 @@ test('switches between Bundles and indented Settings tab for enabled aggregates 
       ['@miorin/dsh-atlas-visual', '@local/custom-bundle'],
     )
     assert.equal(settingsPanel.findAllByProps({ className: 'dsh-atlas-settings-group-body' }).length, 2)
-    assert.deepEqual(factoryCalls, [
-      { name: 'dsh-aggregate.config:@miorin/dsh-atlas-visual', inputProps: { view: 'page' } },
-      { name: 'dsh-aggregate.config:@local/custom-bundle', inputProps: { view: 'page' } },
-    ])
+    assert.deepEqual(
+      [...new Set(factoryCalls.map(call => call.name))],
+      ['dsh-aggregate.config:@miorin/dsh-atlas-visual', 'dsh-aggregate.config:@local/custom-bundle'],
+    )
+    assert.ok(factoryCalls.every(call => call.inputProps.view === 'page'))
 
-    // Clicking group title navigates to that bundle's detail page.
+    // Clicking the right-hand open button on a settings group navigates to that bundle's detail page.
     groups[0].findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' }).props.onClick()
     assert.deepEqual(openedBundles, ['@miorin/dsh-atlas-visual'])
 
-    // Custom factory without child slot count falls back to plain Settings label.
+    // Clicking a settings group's subheading collapses only that group's indented body.
+    const visualGroupToggle = groups[0].findByProps({ 'data-atlas-settings-group-toggle': '@miorin/dsh-atlas-visual' })
+    assert.equal(visualGroupToggle.props['aria-expanded'], true)
+    await act(async () => { visualGroupToggle.props.onClick() })
+    assert.equal(
+      view!.root.findByProps({ 'data-atlas-settings-group-toggle': '@miorin/dsh-atlas-visual' }).props['aria-expanded'],
+      false,
+    )
+    assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-settings-group-body' }).length, 1)
+    await act(async () => {
+      view!.root.findByProps({ 'data-atlas-settings-group-toggle': '@miorin/dsh-atlas-visual' }).props.onClick()
+    })
+    assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-settings-group-body' }).length, 2)
+
+    // Clicking the top section subheadings collapses/expands Bundles and Settings sections.
+    const bundlesToggle = view!.root.findByProps({ 'data-atlas-section-toggle': 'bundles' })
+    assert.equal(bundlesToggle.props['aria-expanded'], true)
+    await act(async () => { bundlesToggle.props.onClick() })
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-panel': 'bundles' }).length, 0)
+    await act(async () => {
+      view!.root.findByProps({ 'data-atlas-section-toggle': 'bundles' }).props.onClick()
+    })
+    assert.ok(view!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
+
+    await act(async () => {
+      view!.root.findByProps({ 'data-atlas-section-toggle': 'settings' }).props.onClick()
+    })
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-panel': 'settings' }).length, 0)
+    await act(async () => {
+      view!.root.findByProps({ 'data-atlas-section-toggle': 'settings' }).props.onClick()
+    })
+    assert.ok(view!.root.findByProps({ 'data-atlas-panel': 'settings' }))
+
+    // Custom factory without child slot count falls back to bundle count (2 configurable bundles).
     await act(async () => {
       setFactory('@local/custom-bundle', [])
       emitSlot('dsh-aggregate.member-config:@local/custom-bundle')
     })
-    const updatedTabs = view!.root.findAllByProps({ role: 'tab' })
-    assert.ok(updatedTabs[1].findAll(n => n.children?.includes('bundleSettingsPlain')).length > 0)
+    assert.ok(view!.root.findByProps({ 'data-atlas-section-toggle': 'settings' }).findAll(n => n.children?.includes('2')).length > 0)
 
-    // Drop all member settings -> tabs disappear and panel returns to Bundles.
+    // Drop all member settings -> Settings section disappears cleanly while Bundles remains.
     await act(async () => {
       setFactory('@miorin/dsh-atlas-visual', null)
       setFactory('@local/custom-bundle', null)
       emitSlot('dsh-aggregate.member-config:@miorin/dsh-atlas-visual')
     })
-    assert.equal(view!.root.findAllByProps({ 'data-atlas-tabs': '' }).length, 0)
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-section': 'settings' }).length, 0)
     assert.ok(view!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
   } finally {
     globalThis.fetch = originalFetch
@@ -729,7 +717,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
   })
   assert.equal(listEntry?.id, '@miorin/dsh-atlas-list')
   const primitivesStub = {
-    SegmentedTabs: SegmentedTabsStub,
     Switch: SwitchStub,
     PluginArtworkSubagent: () => null,
   }
@@ -758,18 +745,17 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
       await Promise.resolve()
     })
 
-    // 1. Standalone aggregate detail page shows Sub-plugins & Settings tabs, switches, soft-fold style, and outline jump.
-    const listTabs = renderer!.root.findAllByProps({ role: 'tab' })
-    assert.equal(listTabs.length, 2)
-    assert.equal(listTabs[0].props['aria-selected'], true)
-    assert.ok(listTabs[0].findAll(n => n.children?.includes('Sub-plugins (1)')).length > 0)
-    assert.ok(listTabs[1].findAll(n => n.children?.includes('Settings (1)')).length > 0)
+    // 1. Standalone aggregate detail page shows unified Sub-plugins & Settings collapsible sections (no tabs).
+    assert.equal(renderer!.root.findAllByProps({ role: 'tab' }).length, 0)
+    assert.ok(renderer!.root.findByProps({ 'data-dsh-aggregate-section': 'plugins' }))
+    assert.ok(renderer!.root.findByProps({ 'data-dsh-aggregate-section': 'settings' }))
 
     const pluginsPanel = renderer!.root.findByProps({ 'data-dsh-aggregate-panel': 'plugins' })
     const memberSwitch = pluginsPanel.findByProps({ role: 'switch' })
     assert.equal(memberSwitch.props['aria-checked'], true)
     assert.equal(memberSwitch.props.disabled, false)
 
+    // Soft-fold raw rows style toggles cleanly.
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
     const rawToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-raw-rows-toggle': '@miorin/dsh-atlas-list' })
     assert.equal(rawToggle.props['aria-expanded'], false)
@@ -779,40 +765,55 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     await act(async () => { rawToggle.props.onClick() })
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
 
+    // Subheadings collapse/expand Plugins section, Settings section, and per-member settings.
+    const pluginsSectionToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-section-toggle': 'plugins' })
+    await act(async () => { pluginsSectionToggle.props.onClick() })
+    assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-panel': 'plugins' }).length, 0)
+    await act(async () => { renderer!.root.findByProps({ 'data-dsh-aggregate-section-toggle': 'plugins' }).props.onClick() })
+    assert.ok(renderer!.root.findByProps({ 'data-dsh-aggregate-panel': 'plugins' }))
+
+    const memberToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' })
+    assert.equal(memberToggle.props['aria-expanded'], true)
+    await act(async () => { memberToggle.props.onClick() })
+    assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
+
+    const settingsSectionToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-section-toggle': 'settings' })
+    await act(async () => { settingsSectionToggle.props.onClick() })
+    assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-panel': 'settings' }).length, 0)
+
+    // Clicking jump link in Plugins auto-re-expands both the Settings section and that collapsed member.
     const jumpBtn = renderer!.root.findByProps({ 'data-dsh-aggregate-jump': '@miorin/dsh-watched-sessions' })
     await act(async () => { jumpBtn.props.onClick() })
     assert.ok(renderer!.root.findByProps({ 'data-dsh-aggregate-panel': 'settings' }))
     const standaloneLeaf = renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' })
     assert.deepEqual(standaloneLeaf.children, ['leaf-ns:watchMode=true'])
 
-    // 2. Switch to dsh-atlas-atlas panel -> top SegmentedTabs shows Bundles (selected) and Settings (1).
+    // 2. Switch to dsh-atlas-atlas panel -> unified view renders BOTH Bundles and indented List Atlas group on one page.
     await act(async () => {
       setTargetKey!('@miorin/dsh-atlas-atlas')
       await Promise.resolve()
       await Promise.resolve()
     })
 
-    const tabs = renderer!.root.findAllByProps({ role: 'tab' })
-    assert.equal(tabs.length, 2)
-    assert.equal(tabs[0].props['aria-selected'], true)
-    assert.equal(tabs[1].props['aria-selected'], false)
-    assert.ok(tabs[1].findAll(n => n.children?.includes('dsh-atlas-atlas:bundleSettings:1')).length > 0)
-
-    // 3. Switch to Settings tab -> renders the exact same leaf component indented inside List Atlas group.
-    await act(async () => {
-      tabs[1].props.onClick()
-    })
+    assert.equal(renderer!.root.findAllByProps({ role: 'tab' }).length, 0)
+    assert.ok(renderer!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
     assert.ok(renderer!.root.findByProps({ 'data-atlas-settings-group': '@miorin/dsh-atlas-list' }))
     const inlineLeaf = renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' })
     assert.deepEqual(inlineLeaf.children, ['leaf-ns:watchMode=true'])
 
-    // 4. Dispose leaf plugin -> factory unregisters, tabs disappear, and view returns to Bundles.
+    // Collapsing the List Atlas group hides its indented member settings.
+    await act(async () => {
+      renderer!.root.findByProps({ 'data-atlas-settings-group-toggle': '@miorin/dsh-atlas-list' }).props.onClick()
+    })
+    assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
+
+    // 3. Dispose leaf plugin -> factory unregisters, Settings section disappears, and Bundles remains.
     await act(async () => {
       disposeLeaf()
       await Promise.resolve()
       await Promise.resolve()
     })
-    assert.equal(renderer!.root.findAllByProps({ 'data-atlas-tabs': '' }).length, 0)
+    assert.equal(renderer!.root.findAllByProps({ 'data-atlas-section': 'settings' }).length, 0)
     assert.ok(renderer!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
     assert.equal(ctx.slots.snapshot('factory:dsh-aggregate.config:@miorin/dsh-atlas-list').length, 0)
   } finally {

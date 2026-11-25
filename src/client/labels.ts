@@ -90,8 +90,6 @@ const en = {
   bundleSettings: 'Settings ({count})',
   bundleSettingsPlain: 'Settings',
   openBundleDetails: 'Open {name} details',
-  tabBundles: 'Bundles',
-  tabsLabel: 'Atlas manager views',
 }
 
 export type AtlasLabelKey = keyof typeof en
@@ -192,8 +190,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: '设置（{count}）',
     bundleSettingsPlain: '设置',
     openBundleDetails: '打开{name}详情页',
-    tabBundles: '成员包',
-    tabsLabel: '管理卡视图',
   },
   ja: {
     uninstall: 'アンインストール',
@@ -285,8 +281,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: '設定 ({count})',
     bundleSettingsPlain: '設定',
     openBundleDetails: '{name}の詳細を開く',
-    tabBundles: 'バンドル',
-    tabsLabel: '管理ビュー',
   },
   de: {
     uninstall: 'Deinstallieren',
@@ -378,8 +372,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: 'Einstellungen ({count})',
     bundleSettingsPlain: 'Einstellungen',
     openBundleDetails: 'Details zu {name} öffnen',
-    tabBundles: 'Bundles',
-    tabsLabel: 'Manager-Ansichten',
   },
   es: {
     uninstall: 'Desinstalar',
@@ -471,8 +463,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: 'Configuración ({count})',
     bundleSettingsPlain: 'Configuración',
     openBundleDetails: 'Abrir detalles de {name}',
-    tabBundles: 'Paquetes',
-    tabsLabel: 'Vistas del gestor',
   },
   fr: {
     uninstall: 'Désinstaller',
@@ -564,8 +554,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: 'Paramètres ({count})',
     bundleSettingsPlain: 'Paramètres',
     openBundleDetails: 'Ouvrir les détails de {name}',
-    tabBundles: 'Lots',
-    tabsLabel: 'Vues du gestionnaire',
   },
   pt: {
     uninstall: 'Desinstalar',
@@ -657,8 +645,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: 'Configurações ({count})',
     bundleSettingsPlain: 'Configurações',
     openBundleDetails: 'Abrir detalhes de {name}',
-    tabBundles: 'Pacotes',
-    tabsLabel: 'Visualizações do gerenciador',
   },
   ru: {
     uninstall: 'Удалить',
@@ -750,7 +736,5 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     bundleSettings: 'Настройки ({count})',
     bundleSettingsPlain: 'Настройки',
     openBundleDetails: 'Открыть страницу {name}',
-    tabBundles: 'Комплекты',
-    tabsLabel: 'Разделы менеджера',
   },
 }

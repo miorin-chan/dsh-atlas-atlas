@@ -15,10 +15,11 @@
 外观的顺序渲染七个开关，并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
 对已启用且暴露了 `dsh-aggregate.config:<bundleName>` Slot Factory 的聚合包（包含官方七个与自动发现的聚合包），
-管理卡订阅 `plugins.bundle.config` 与成员子槽变更，在顶部提供原生 `SegmentedTabs` 切换「成员包」与「设置（N）」视图：
-切换到「设置」后，按管理卡顺序以分组形式展示全部活跃成员设置，并在左侧留出缩进与竖向引导线。
-对于已安装的官方或自动发现的聚合包，点击行内或设置分组标题中的图标或标题会调用 `ctx.pluginNavigation.openBundle`
-直接跳转到该聚合包的详情页（未安装包保持静态展示）。
+管理卡订阅 `plugins.bundle.config` 与成员子槽变更，
+在统一单页内以「模块化改良计划成员包」「其他已安装的聚合包」和「设置」三个可折叠小节纵向组织全部开关与设置：
+每个小节与设置分组均以子标题作为展开/折叠开关，分组设置主体在左侧留出缩进与竖向引导线。
+对于已安装的官方或自动发现的聚合包，点击成员包行内图标/标题，或点击设置分组标题右侧的跳转箭头，
+会调用 `ctx.pluginNavigation.openBundle` 直接跳转到该聚合包的详情页（未安装包保持静态展示）。
 
 开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，
 保存实际安装的精确版本；脉络和外观作为本地成员在此模式下仅显示本地安装提示，不尝试请求 npm。
@@ -93,14 +94,15 @@ npm run check
 - 重载页面后确认状态，并检查英文浅色、英文深色和中文深色界面。
   Chrome 未报告未捕获异常或 Atlas 插槽错误。
 
-## 一次性 profile 实测（顶部标签聚合设置与跳转）
+## 一次性 profile 实测（统一折叠视图与子插件大纲）
 
 2026-11-25，使用 DSH `0.2.2-rc.5` 与 `tools/dsh-web-drive` 在一次性 `web` profile 加载 `dsh-atlas-atlas`、
-`dsh-atlas-list` 与 `dsh-atlas-visual`。
+`dsh-atlas-list` 与 `dsh-atlas-workspace`。
 
-- Visual Atlas 独立详情页通过 `SlotFactory` 正常渲染未登录时激活的 3 项成员设置。
-- 管理卡详情页默认显示 `Bundles` 标签并保持列表整洁，顶部原生 `SegmentedTabs` 右侧显示 `Settings (5)`。
-- 切换到 `Settings (5)` 后，按顺序分组渲染 List Atlas（2 项）与 Visual Atlas（3 项）的完整成员设置，
-  设置主体较分组标题明显向右缩进并带 `1px` 左引导线；全程无控制台错误、未捕获异常或日志报错。
-- 在管理卡列表或设置分组标题中点击已安装的 Visual Atlas 标题后，
-  页面直接跳转到 `@miorin/dsh-atlas-visual` 详情页并正常显示其聚合设置，未安装的 Workspace Atlas 不显示跳转按钮。
+- 管理卡统一单页同时呈现「成员包（7）」与缩进的「设置」小节，各小节、聚合分组及其成员子标题均可独立折叠与展开；
+  设置分组主体较分组标题右移 `14px` 并带 `1px` 左引导线。
+- 在 List Atlas 设置分组点击右侧跳转按钮直接打开 `@miorin/dsh-atlas-list` 详情页；
+  详情页纵向展示「子插件（5）」与「设置（2）」，原生 `[data-plugin-rows]` 初始为 `display: none` 且可通过底部开关展开；
+  先折叠「设置」及 `@miorin/dsh-watched-sessions` 后点击子插件大纲，两者自动展开并高亮对应设置。
+- Workspace Atlas（0 个可配置成员）仅展示可折叠的「子插件（4）」小节并软折叠原生 `[data-plugin-rows]`；
+  全程无控制台错误、未捕获异常或日志报错。

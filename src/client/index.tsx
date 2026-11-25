@@ -6,7 +6,6 @@ import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginConfigViewProps, PluginDetailProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import { SegmentedTabs } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
@@ -283,6 +282,25 @@ export function apply(ctx: ClientContext): void {
     )
   }
 
+  function ChevronArrow({ className }: { className: string }) {
+    return (
+      <svg
+        className={className}
+        width="12"
+        height="12"
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4.5 2.5 8 6l-3.5 3.5" />
+      </svg>
+    )
+  }
+
   function BundleRowTitle({
     packageName,
     displayName,
@@ -304,20 +322,7 @@ export function apply(ctx: ClientContext): void {
         onClick={() => onOpen(packageName)}
       >
         <span>{displayName}</span>
-        <svg
-          className="dsh-atlas-manager-link-arrow"
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M4.5 2.5 8 6l-3.5 3.5" />
-        </svg>
+        <ChevronArrow className="dsh-atlas-manager-link-arrow" />
       </button>
     )
   }
@@ -339,7 +344,10 @@ export function apply(ctx: ClientContext): void {
     const [overview, setOverview] = useState<LocalDevOverview>()
     const [localDevBusy, setLocalDevBusy] = useState(false)
     const [localDevError, setLocalDevError] = useState<{ packageName: string; code: LocalDevErrorCode; detail?: string }>()
-    const [activeTab, setActiveTab] = useState<'bundles' | 'settings'>('bundles')
+    const [bundlesOpen, setBundlesOpen] = useState(true)
+    const [discoveredOpen, setDiscoveredOpen] = useState(true)
+    const [settingsOpen, setSettingsOpen] = useState(true)
+    const [collapsedGroups, setCollapsedGroups] = useState<Readonly<Record<string, true>>>({})
     const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
     useSyncExternalStore(subscribeLocale, localeSnapshot)
     const listId = useId()
@@ -417,12 +425,6 @@ export function apply(ctx: ClientContext): void {
       dialog.showModal()
       cancelUninstall.current?.focus()
     }, [uninstallTarget])
-
-    useEffect(() => {
-      if (Array.isArray(inventory) && configurableBundles.length === 0) {
-        setActiveTab('bundles')
-      }
-    }, [inventory, configurableBundles.length])
 
     if (!canList) return <p className="dsh-atlas-manager-status">{t('readDenied')}</p>
     if (inventory === undefined) return <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
@@ -512,97 +514,92 @@ export function apply(ctx: ClientContext): void {
 
     const statusByPackage = new Map((overview?.aggregateBundles ?? []).map(item => [item.packageName, item]))
     const openBundle = (packageName: string) => { getPluginNavigation()?.openBundle(packageName) }
-    const hasSettingsTab = configurableBundles.length > 0
-    const effectiveTab = hasSettingsTab ? activeTab : 'bundles'
+    const toggleGroup = (packageName: string) => {
+      setCollapsedGroups(prev => {
+        const next = { ...prev }
+        if (next[packageName]) delete next[packageName]
+        else next[packageName] = true
+        return next
+      })
+    }
+    const hasSettings = configurableBundles.length > 0
     const allCounted = configurableBundles.every(entry => typeof entry.settings.count === 'number')
     const totalSettingsCount = allCounted
       ? configurableBundles.reduce((sum, entry) => sum + (entry.settings.count ?? 0), 0)
       : undefined
-    const settingsTabLabel = totalSettingsCount !== undefined
-      ? t('bundleSettings', { count: totalSettingsCount })
-      : t('bundleSettingsPlain')
-    const bundlesTabId = `${listId}-tab-bundles`
-    const settingsTabId = `${listId}-tab-settings`
-    const bundlesPanelId = `${listId}-panel-bundles`
-    const settingsPanelId = `${listId}-panel-settings`
+    const bundlesBodyId = `${listId}-bundles-body`
+    const discoveredBodyId = `${listId}-discovered-body`
+    const settingsBodyId = `${listId}-settings-body`
 
     return (
       <div data-atlas-manager="">
-        {hasSettingsTab && (
-          <div className="dsh-atlas-tabs-bar" data-atlas-tabs="">
-            <SegmentedTabs
-              size="sm"
-              className="dsh-atlas-tabs"
-              label={t('tabsLabel')}
-              value={effectiveTab}
-              onChange={setActiveTab}
-              items={[
-                { value: 'bundles', label: t('tabBundles'), id: bundlesTabId, panelId: bundlesPanelId },
-                { value: 'settings', label: settingsTabLabel, id: settingsTabId, panelId: settingsPanelId },
-              ]}
-            />
+        <section className="dsh-atlas-manager-repositories" aria-busy={saving || localDevBusy}>
+          <div className="dsh-atlas-manager-repository-row">
+            <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('localDevToggle')}</span>
+            <button type="button" role="switch" className="dsh-atlas-manager-switch"
+              aria-labelledby={`${pathId}-mode`} aria-checked={localDevEnabled}
+              aria-disabled={!canEdit || busy}
+              aria-describedby={`${pathId}-mode-help`}
+              disabled={!canEdit || busy}
+              onClick={() => { void toggleLocalDev(!localDevEnabled) }}>
+              <span className="dsh-atlas-manager-thumb" />
+            </button>
           </div>
-        )}
-
-        {effectiveTab === 'bundles' && (
-          <div
-            role="tabpanel"
-            id={bundlesPanelId}
-            aria-labelledby={hasSettingsTab ? bundlesTabId : undefined}
-            data-atlas-panel="bundles"
-          >
-            <section className="dsh-atlas-manager-repositories" aria-busy={saving || localDevBusy}>
-              <div className="dsh-atlas-manager-repository-row">
-                <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('localDevToggle')}</span>
-                <button type="button" role="switch" className="dsh-atlas-manager-switch"
-                  aria-labelledby={`${pathId}-mode`} aria-checked={localDevEnabled}
-                  aria-disabled={!canEdit || busy}
-                  aria-describedby={`${pathId}-mode-help`}
+          <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localDevHelp')}</p>
+          {localDevEnabled && (
+            <div className="dsh-atlas-manager-path">
+              <label htmlFor={pathId}>{t('localWorkspaceDir')}</label>
+              <div className="dsh-atlas-manager-path-controls">
+                <input
+                  type="text"
+                  id={pathId}
+                  value={workspaceDir}
+                  placeholder="/path/to/plugins"
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-describedby={`${pathId}-help`}
+                  aria-invalid={!pathValid}
                   disabled={!canEdit || busy}
-                  onClick={() => { void toggleLocalDev(!localDevEnabled) }}>
-                  <span className="dsh-atlas-manager-thumb" />
+                  onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
+                  onKeyDown={event => { if (event.key === 'Enter') void saveWorkspaceDir() }}
+                />
+                <button
+                  type="button"
+                  className="dsh-atlas-manager-retry"
+                  disabled={!canEdit || busy || !pathValid || !pathDirty}
+                  onClick={() => { void saveWorkspaceDir() }}
+                >
+                  {t('saveWorkspaceDir')}
                 </button>
               </div>
-              <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localDevHelp')}</p>
-              {localDevEnabled && (
-                <div className="dsh-atlas-manager-path">
-                  <label htmlFor={pathId}>{t('localWorkspaceDir')}</label>
-                  <div className="dsh-atlas-manager-path-controls">
-                    <input
-                      type="text"
-                      id={pathId}
-                      value={workspaceDir}
-                      placeholder="/path/to/plugins"
-                      spellCheck={false}
-                      autoComplete="off"
-                      aria-describedby={`${pathId}-help`}
-                      aria-invalid={!pathValid}
-                      disabled={!canEdit || busy}
-                      onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
-                      onKeyDown={event => { if (event.key === 'Enter') void saveWorkspaceDir() }}
-                    />
-                    <button
-                      type="button"
-                      className="dsh-atlas-manager-retry"
-                      disabled={!canEdit || busy || !pathValid || !pathDirty}
-                      onClick={() => { void saveWorkspaceDir() }}
-                    >
-                      {t('saveWorkspaceDir')}
-                    </button>
-                  </div>
-                  <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={!pathValid || overview?.workspaceDirIssue ? '' : undefined}>
-                    {!pathValid
-                      ? t('invalidWorkspaceDir')
-                      : overview?.workspaceDirIssue ?? t('localWorkspaceDirHelp')}
-                  </p>
-                </div>
-              )}
-              {settings.status !== 'loading' && !canEdit && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-              {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('localDevApplyFailed')}</p>}
-            </section>
+              <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={!pathValid || overview?.workspaceDirIssue ? '' : undefined}>
+                {!pathValid
+                  ? t('invalidWorkspaceDir')
+                  : overview?.workspaceDirIssue ?? t('localWorkspaceDirHelp')}
+              </p>
+            </div>
+          )}
+          {settings.status !== 'loading' && !canEdit && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
+          {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('localDevApplyFailed')}</p>}
+        </section>
 
-            <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
-            <ul className="dsh-atlas-manager-list" aria-labelledby={listId}>
+        <section className="dsh-atlas-section" data-atlas-section="bundles">
+          <h4 className="dsh-atlas-manager-heading" id={listId}>
+            <button
+              type="button"
+              className="dsh-atlas-section-toggle"
+              data-atlas-section-toggle="bundles"
+              aria-expanded={bundlesOpen}
+              aria-controls={bundlesBodyId}
+              onClick={() => setBundlesOpen(prev => !prev)}
+            >
+              <ChevronArrow className="dsh-atlas-chevron" />
+              <span>{t('atlasBundles')}</span>
+              <span className="dsh-atlas-section-count">{ATLASES.length}</span>
+            </button>
+          </h4>
+          {bundlesOpen && (
+            <ul id={bundlesBodyId} className="dsh-atlas-manager-list" data-atlas-panel="bundles" aria-labelledby={listId}>
               {ATLASES.map(atlas => {
                 const packageName = ATLAS_BUNDLES[atlas]
                 const bundle = inventory.find(item => item.name === packageName)
@@ -701,98 +698,146 @@ export function apply(ctx: ClientContext): void {
                 )
               })}
             </ul>
+          )}
+        </section>
 
-            {discoveredAggregates.length > 0 && (
-              <>
-                <h5 className="dsh-atlas-manager-subheading">{t('otherAggregates')}</h5>
-                <ul className="dsh-atlas-manager-list" data-discovered-aggregates="">
-                  {discoveredAggregates.map(item => {
-                    const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
-                    const canOpenBundle = item.installed && canNavigate
-                    return (
-                      <li key={item.packageName} className="dsh-atlas-manager-row">
-                        <BundleRowIcon
-                          packageName={item.packageName}
-                          src={ATLAS_ICONS.plugin}
-                          size={24}
-                          canOpen={canOpenBundle}
-                          onOpen={openBundle}
-                        />
-                        <div className="dsh-atlas-manager-copy">
-                          <div className="dsh-atlas-manager-label">
-                            <BundleRowTitle
-                              packageName={item.packageName}
-                              displayName={item.packageName}
-                              canOpen={canOpenBundle}
-                              onOpen={openBundle}
-                            />
-                            {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
-                              <span className="dsh-atlas-manager-tags">
-                                {item.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-                                {item.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
-                              </span>
-                            )}
-                          </div>
-                          <p className="dsh-atlas-manager-status">
-                            {t(item.enabled ? 'enabled' : 'disabled')} · {item.members.length}
-                          </p>
-                          {localDevEnabled && (
-                            <LocalDevControls
-                              status={item}
-                              busy={busy}
-                              canSwitch={canSwitchLocal}
-                              onAction={req => { void runLocalDevAction(req) }}
-                            />
-                          )}
-                          {rowError && (
-                            <p className="dsh-atlas-manager-status" data-error="" role="alert">
-                              {t(localDevErrorKey(rowError.code))}
-                              {rowError.detail ? ` (${rowError.detail})` : ''}
-                            </p>
+        {discoveredAggregates.length > 0 && (
+          <section className="dsh-atlas-section" data-atlas-section="discovered">
+            <h5 className="dsh-atlas-manager-subheading">
+              <button
+                type="button"
+                className="dsh-atlas-section-toggle"
+                data-atlas-section-toggle="discovered"
+                aria-expanded={discoveredOpen}
+                aria-controls={discoveredBodyId}
+                onClick={() => setDiscoveredOpen(prev => !prev)}
+              >
+                <ChevronArrow className="dsh-atlas-chevron" />
+                <span>{t('otherAggregates')}</span>
+                <span className="dsh-atlas-section-count">{discoveredAggregates.length}</span>
+              </button>
+            </h5>
+            {discoveredOpen && (
+              <ul id={discoveredBodyId} className="dsh-atlas-manager-list" data-discovered-aggregates="">
+                {discoveredAggregates.map(item => {
+                  const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
+                  const canOpenBundle = item.installed && canNavigate
+                  return (
+                    <li key={item.packageName} className="dsh-atlas-manager-row">
+                      <BundleRowIcon
+                        packageName={item.packageName}
+                        src={ATLAS_ICONS.plugin}
+                        size={24}
+                        canOpen={canOpenBundle}
+                        onOpen={openBundle}
+                      />
+                      <div className="dsh-atlas-manager-copy">
+                        <div className="dsh-atlas-manager-label">
+                          <BundleRowTitle
+                            packageName={item.packageName}
+                            displayName={item.packageName}
+                            canOpen={canOpenBundle}
+                            onOpen={openBundle}
+                          />
+                          {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
+                            <span className="dsh-atlas-manager-tags">
+                              {item.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
+                              {item.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+                            </span>
                           )}
                         </div>
-                        <div className="dsh-atlas-manager-control" />
-                      </li>
-                    )
-                  })}
-                </ul>
-              </>
+                        <p className="dsh-atlas-manager-status">
+                          {t(item.enabled ? 'enabled' : 'disabled')} · {item.members.length}
+                        </p>
+                        {localDevEnabled && (
+                          <LocalDevControls
+                            status={item}
+                            busy={busy}
+                            canSwitch={canSwitchLocal}
+                            onAction={req => { void runLocalDevAction(req) }}
+                          />
+                        )}
+                        {rowError && (
+                          <p className="dsh-atlas-manager-status" data-error="" role="alert">
+                            {t(localDevErrorKey(rowError.code))}
+                            {rowError.detail ? ` (${rowError.detail})` : ''}
+                          </p>
+                        )}
+                      </div>
+                      <div className="dsh-atlas-manager-control" />
+                    </li>
+                  )
+                })}
+              </ul>
             )}
-          </div>
+          </section>
         )}
 
-        {effectiveTab === 'settings' && (
-          <div
-            role="tabpanel"
-            id={settingsPanelId}
-            aria-labelledby={settingsTabId}
-            data-atlas-panel="settings"
-            className="dsh-atlas-settings-groups"
-          >
-            {configurableBundles.map(entry => (
-              <section key={entry.packageName} className="dsh-atlas-settings-group" data-atlas-settings-group={entry.packageName}>
-                <div className="dsh-atlas-settings-group-head">
-                  <BundleRowIcon
-                    packageName={entry.packageName}
-                    src={entry.iconSrc}
-                    size={20}
-                    className="dsh-atlas-settings-group-icon"
-                    canOpen={entry.canOpen}
-                    onOpen={openBundle}
-                  />
-                  <BundleRowTitle
-                    packageName={entry.packageName}
-                    displayName={entry.displayName}
-                    canOpen={entry.canOpen}
-                    onOpen={openBundle}
-                  />
-                </div>
-                <div className="dsh-atlas-settings-group-body">
-                  {renderDynamicFactorySlot(renderFactorySlot!, entry.settings.factoryName, { view: 'page' })}
-                </div>
-              </section>
-            ))}
-          </div>
+        {hasSettings && (
+          <section className="dsh-atlas-section dsh-atlas-settings-section" data-atlas-section="settings">
+            <h4 className="dsh-atlas-manager-heading">
+              <button
+                type="button"
+                className="dsh-atlas-section-toggle"
+                data-atlas-section-toggle="settings"
+                aria-expanded={settingsOpen}
+                aria-controls={settingsBodyId}
+                onClick={() => setSettingsOpen(prev => !prev)}
+              >
+                <ChevronArrow className="dsh-atlas-chevron" />
+                <span>{t('bundleSettingsPlain')}</span>
+                <span className="dsh-atlas-section-count">{totalSettingsCount ?? configurableBundles.length}</span>
+              </button>
+            </h4>
+            {settingsOpen && (
+              <div id={settingsBodyId} data-atlas-panel="settings" className="dsh-atlas-settings-groups">
+                {configurableBundles.map((entry, index) => {
+                  const groupOpen = !collapsedGroups[entry.packageName]
+                  const groupBodyId = `${settingsBodyId}-group-${index}`
+                  return (
+                    <section key={entry.packageName} className="dsh-atlas-settings-group" data-atlas-settings-group={entry.packageName}>
+                      <div className="dsh-atlas-settings-group-head">
+                        <button
+                          type="button"
+                          className="dsh-atlas-settings-group-toggle"
+                          data-atlas-settings-group-toggle={entry.packageName}
+                          aria-expanded={groupOpen}
+                          aria-controls={groupBodyId}
+                          onClick={() => toggleGroup(entry.packageName)}
+                        >
+                          <ChevronArrow className="dsh-atlas-chevron" />
+                          <span className="dsh-atlas-manager-icon dsh-atlas-settings-group-icon" aria-hidden="true">
+                            <img src={entry.iconSrc} width={20} height={20} alt="" />
+                          </span>
+                          <span>{entry.displayName}</span>
+                          {typeof entry.settings.count === 'number' && (
+                            <span className="dsh-atlas-section-count">{entry.settings.count}</span>
+                          )}
+                        </button>
+                        {entry.canOpen && (
+                          <button
+                            type="button"
+                            className="dsh-atlas-settings-group-open"
+                            data-atlas-open={entry.packageName}
+                            title={t('openBundleDetails', { name: entry.displayName })}
+                            aria-label={t('openBundleDetails', { name: entry.displayName })}
+                            onClick={() => openBundle(entry.packageName)}
+                          >
+                            <ChevronArrow className="dsh-atlas-manager-link-arrow" />
+                          </button>
+                        )}
+                      </div>
+                      {groupOpen && (
+                        <div id={groupBodyId} className="dsh-atlas-settings-group-body">
+                          {renderDynamicFactorySlot(renderFactorySlot!, entry.settings.factoryName, { view: 'page' })}
+                        </div>
+                      )}
+                    </section>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         )}
 
         <dialog ref={uninstallDialog} className="dsh-atlas-manager-uninstall-dialog"
