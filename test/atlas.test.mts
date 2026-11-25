@@ -102,14 +102,14 @@ test('requires a local copy of Continuity and Visual but can toggle an existing 
 
 test('reports row conflict when enabling Visual while a standalone member is enabled', async () => {
   const visual = ATLAS_BUNDLES.visual
-  const standalone = newBundle('dsh-claudelike-ui', { enabled: true, rows: [{ rowId: 'dsh-claudelike-ui' }] })
+  const standalone = newBundle('@miorin/dsh-claudelike-ui', { enabled: true, rows: [{ rowId: 'dsh-claudelike-ui' }] })
   const { manager, profile, writes } = fixture([
     newBundle(visual, { rows: [{ rowId: 'dsh-claudelike-ui' }, { rowId: 'dsh-peak-pricing-sidebar' }] }),
     standalone,
   ])
   assert.deepEqual(await setAtlasEnabled(manager, 'visual', true, ignoreProgress), {
     kind: 'conflict',
-    bundle: 'dsh-claudelike-ui',
+    bundle: '@miorin/dsh-claudelike-ui',
     row: 'dsh-claudelike-ui',
   })
   assert.equal(profile.get(visual).enabled, false)
