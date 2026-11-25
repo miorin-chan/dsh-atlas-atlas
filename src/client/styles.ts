@@ -34,6 +34,13 @@ export const CSS = `
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
+.dsh-atlas-manager-subheading {
+  margin: 14px 0 4px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
 .dsh-atlas-manager-list {
   list-style: none;
   margin: 0;
@@ -61,7 +68,53 @@ export const CSS = `
 }
 .dsh-atlas-manager-icon > img { object-fit: contain; }
 .dsh-atlas-manager-copy { min-width: 0; }
-.dsh-atlas-manager-label { font-size: 14px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.dsh-atlas-manager-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.dsh-atlas-manager-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dsh-atlas-local-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-brand-primary);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);
+}
+.dsh-atlas-local-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.dsh-atlas-local-btn {
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  cursor: pointer;
+}
+.dsh-atlas-local-btn:disabled { cursor: default; opacity: 0.55; }
+@media (hover: hover) {
+  .dsh-atlas-local-btn:enabled:hover { background: var(--dsw-alias-interactive-bg-hover); }
+}
 .dsh-atlas-manager-status {
   font-size: 13px;
   line-height: 18px;
@@ -158,7 +211,8 @@ export const CSS = `
 }
 .dsh-atlas-manager-switch[aria-disabled='true'] { cursor: default; opacity: 0.55; }
 .dsh-atlas-manager-switch:focus-visible, .dsh-atlas-manager-retry:focus-visible,
-.dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible {
+.dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible,
+.dsh-atlas-local-btn:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: 2px;
 }
@@ -174,6 +228,48 @@ export const CSS = `
 .dsh-atlas-manager-switch[aria-checked='true'] .dsh-atlas-manager-thumb {
   background: var(--dsw-alias-label-primary-foreground);
   transform: translateX(16px);
+}
+.dsh-atlas-local-detail {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+  font-size: 13px;
+  line-height: 18px;
+}
+.dsh-atlas-local-detail > h4 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+.dsh-atlas-local-feature {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.dsh-atlas-local-feature-info {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.dsh-atlas-local-feature-title {
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+.dsh-atlas-local-feature-meta {
+  color: var(--dsw-alias-label-secondary);
+  overflow-wrap: anywhere;
+}
+.dsh-atlas-local-members-list {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+  color: var(--dsw-alias-label-secondary);
 }
 @media (prefers-reduced-motion: reduce) {
   .dsh-atlas-manager-thumb { transition: none; }

@@ -15,8 +15,11 @@ Check whether new behavior belongs in its own bundle.
 - `README.md` is for users: installation, usage, commands, and limits.
   Provide `README.zh.md` as its Chinese version.
 - [docs/README.md](docs/README.md) records the package's behavior, build steps, and verification.
-- [src/lib/atlas.ts](src/lib/atlas.ts) declares the member bundle names on npm and handles their installation
-  and selection.
+- [src/lib/atlas.ts](src/lib/atlas.ts) declares the official Atlas bundle names and handles bundle enablement
+  and removal.
+- [src/lib/local-dev-service.ts](src/lib/local-dev-service.ts)
+  and [src/lib/overlay-builder.ts](src/lib/overlay-builder.ts) implement dual local-link switching (package self-link
+  and aggregate member-link) under `<profileDir>/dsh-atlas-local-dev/`.
 - Keep the plugin detail page short.
   Set `meta.title` and `meta.description` in `locale/*.json` for the DSH interface language.
   Use `meta.detail` in each locale to select a short, packaged Markdown document when needed.

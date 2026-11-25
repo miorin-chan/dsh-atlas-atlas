@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ATLAS_BUNDLES, PACKAGE, canUninstallAtlas, isLocalOnlyAtlas, linkAtlas, localAtlasSpec, setAtlasEnabled, uninstallAtlas } from '../lib/atlas.js'
+import { ATLAS_BUNDLES, PACKAGE, canUninstallAtlas, isLocalOnlyAtlas, setAtlasEnabled, uninstallAtlas } from '../lib/atlas.js'
 
 const workspace = ATLAS_BUNDLES.workspace
 const success = value => ({ ok: true, value })
@@ -22,6 +22,11 @@ function fixture(others = []) {
     async setBundleEnabled(name, enabled) {
       writes.push(['set', name, enabled])
       profile.set(name, { ...profile.get(name), enabled })
+      return applied
+    },
+    async removeBundle(name) {
+      writes.push(['remove', name])
+      profile.delete(name)
       return applied
     },
   }
@@ -93,34 +98,10 @@ test('toggles a locally linked List Atlas without installing from npm', async ()
   assert.deepEqual(writes, [['set', list, true], ['set', list, false]])
 })
 
-const localParent = '/work/my plugins'
-const workspaceSpec = 'link:/work/my plugins/dsh-atlas-workspace'
-
-function localFixture(others = []) {
-  const { manager, profile, writes } = fixture(others)
-  manager.inspect = async spec => {
-    const name = `@miorin/${spec.split('/').at(-1)}`
-    return success(profile.has(name)
-      ? { status: 'refused', problem: 'already-installed', reason: `${name} is already installed` }
-      : { status: 'accepted', kind: 'path', name, bundle: true, version: '0.2.0' })
-  }
-  manager.removeBundle = async name => {
-    writes.push(['remove', name])
-    profile.delete(name)
-    return applied
-  }
-  manager.installBundle = async (spec, options) => {
-    writes.push(['install', spec, options])
-    profile.set(options.expected.name, newBundle(options.expected.name, { removable: true, source: spec }))
-    return applied
-  }
-  return { manager, profile, writes }
-}
-
 test('only uninstalls the requested installed, disabled, removable Atlas', async () => {
-  const entry = newBundle(workspace, { removable: true, source: workspaceSpec })
+  const entry = newBundle(workspace, { removable: true, source: 'link:/work/dsh-atlas-workspace' })
   const unrelated = newBundle(ATLAS_BUNDLES.list, { enabled: true })
-  const { manager, profile, writes } = localFixture([entry, unrelated])
+  const { manager, profile, writes } = fixture([entry, unrelated])
   assert.equal(canUninstallAtlas(entry), true)
   for (const invalid of [
     { ...entry, enabled: true }, { ...entry, installed: false },
@@ -143,104 +124,10 @@ test('only uninstalls the requested installed, disabled, removable Atlas', async
 
 test('reports the DSH diagnosis when uninstalling fails', async () => {
   const entry = newBundle(workspace, { removable: true })
-  const { manager, profile } = localFixture([entry])
+  const { manager, profile } = fixture([entry])
   manager.removeBundle = async () => success({ application: 'failed', error: { code: 'bundle-in-use' } })
   assert.deepEqual(await uninstallAtlas(manager, 'workspace'), { kind: 'uninstallFailed', detail: 'bundle-in-use' })
   assert.equal(profile.get(workspace), entry)
-})
-
-const workspaceOptions = { enabled: false, expected: { name: workspace, version: '0.2.0' } }
-
-test('forms link targets from absolute repository parents only', () => {
-  assert.equal(localAtlasSpec(` ${localParent}/ `, 'workspace'), workspaceSpec)
-  assert.equal(localAtlasSpec('/', 'list'), 'link:/dsh-atlas-list')
-  assert.equal(localAtlasSpec('C:/checkout/../src/', 'mobile'), 'link:C:\\src\\dsh-atlas-mobile')
-  assert.equal(localAtlasSpec('\\\\server\\share\\plugins', 'mobile'), 'link:\\\\server\\share\\plugins\\dsh-atlas-mobile')
-  for (const input of ['', 'plugins', '~/plugins', 'https://example.test/plugins', '/work/\u0000plugins']) {
-    assert.equal(localAtlasSpec(input, 'workspace'), undefined)
-  }
-})
-
-test('links each missing Atlas by its repository name without asking npm', async () => {
-  const { manager, profile, writes } = localFixture()
-  for (const [atlas, name] of Object.entries(ATLAS_BUNDLES)) {
-    const spec = `link:${localParent}/${name.split('/')[1]}`
-    assert.equal(await setAtlasEnabled(manager, atlas, true, ignoreProgress, localParent), undefined)
-    assert.equal(profile.get(name).source, spec)
-    assert.deepEqual(writes.splice(0), [
-      ['install', spec, { enabled: false, expected: { name, version: '0.2.0' } }], ['set', name, true],
-    ])
-    assert.equal(await setAtlasEnabled(manager, atlas, true, ignoreProgress, localParent), undefined)
-    assert.deepEqual(writes, [])
-  }
-})
-
-test('switches an existing npm install to a link and preserves its selection', async () => {
-  for (const enabled of [true, false]) {
-    const entry = newBundle(workspace, { enabled, removable: true, source: `${workspace}@0.2.0` })
-    const { manager, profile, writes } = localFixture([entry])
-    assert.equal(enabled
-      ? await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, localParent)
-      : await linkAtlas(manager, 'workspace', localParent, entry), undefined)
-    assert.equal(profile.get(workspace).source, workspaceSpec)
-    assert.equal(profile.get(workspace).enabled, enabled)
-    assert.deepEqual(writes, [
-      ['remove', workspace], ['install', workspaceSpec, workspaceOptions], ...enabled ? [['set', workspace, true]] : [],
-    ])
-  }
-})
-
-test('saves local enablement even when the package changes require a restart', async () => {
-  const { manager, profile, writes } = localFixture([newBundle(workspace, { removable: true })])
-  const { removeBundle, installBundle } = manager
-  const restart = success({ application: 'restart-required', changed: true })
-  manager.removeBundle = async (...args) => { await removeBundle(...args); return restart }
-  manager.installBundle = async (...args) => { await installBundle(...args); return restart }
-  assert.deepEqual(await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, localParent), { kind: 'restart' })
-  assert.equal(profile.get(workspace).source, workspaceSpec)
-  assert.equal(profile.get(workspace).enabled, true)
-  assert.deepEqual(writes, [['remove', workspace], ['install', workspaceSpec, workspaceOptions], ['set', workspace, true]])
-})
-
-test('rejects unavailable or unrelated repositories before removing the current copy', async () => {
-  const entry = newBundle(workspace, { enabled: true, removable: true })
-  const { manager, profile, writes } = localFixture([entry])
-  for (const inspection of [
-    { status: 'refused', problem: 'not-a-package', reason: 'the path does not exist' },
-    { status: 'refused', problem: 'already-installed', reason: `${PACKAGE} is already installed` },
-    { status: 'accepted', kind: 'path', name: PACKAGE, version: '0.2.0', bundle: true },
-  ]) {
-    manager.inspect = async () => success(inspection)
-    assert.equal((await linkAtlas(manager, 'workspace', localParent, entry))?.kind, 'localLinkFailed')
-    assert.deepEqual(profile.get(workspace), entry)
-    assert.deepEqual(writes, [])
-  }
-})
-
-test('reports a failed link after removal without reinstalling the previous source or falling back to npm', async () => {
-  const entry = newBundle(workspace, { enabled: true, removable: true, source: `${workspace}@0.2.0` })
-  const { manager, profile, writes } = localFixture([entry])
-  manager.installBundle = async (spec, options) => {
-    writes.push(['install', spec, options])
-    return success({ application: 'failed', error: { diagnostic: 'missing build output' } })
-  }
-  assert.deepEqual(await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, localParent), {
-    kind: 'localLinkFailed', detail: `${workspaceSpec}\nmissing build output`,
-  })
-  assert.deepEqual(writes, [['remove', workspace], ['install', workspaceSpec, workspaceOptions]])
-  assert.equal(profile.has(workspace), false)
-})
-
-test('reports a local enable failure without reverting the selection', async () => {
-  const { manager, writes } = localFixture()
-  manager.setBundleEnabled = async (name, enabled) => {
-    writes.push(['set', name, enabled])
-    return success({ application: 'failed', changed: true, error: { diagnostic: 'duplicate row' } })
-  }
-  assert.deepEqual(await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, localParent), {
-    kind: 'enableFailed', detail: 'duplicate row',
-  })
-  assert.deepEqual(writes, [['install', workspaceSpec, workspaceOptions], ['set', workspace, true]])
 })
 
 test('reports missing files for a declared dependency without replacing it', async () => {

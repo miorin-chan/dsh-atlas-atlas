@@ -11,7 +11,8 @@
 
 ## 行为
 
-管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、脉络的顺序渲染六个开关。
+管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、脉络的顺序渲染六个开关，
+并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
 
 开启尚未安装的成员包时，管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，保存实际安装的精确版本。
@@ -20,11 +21,20 @@
 默认模式下，再次开启和关闭都使用 `setBundleEnabled`，复用已有安装和逐项设置。
 脉络是本地成员，尚未安装时显示本地安装提示，不尝试请求 npm。
 
-本地模式通过 DSH 配置表单同时保存来源开关和仓库父目录。
-每个目标是父目录下与包名去除 scope 后同名的子目录，以 `link:` 安装。
-管理卡先检查本地包名，首次安装和来源切换也由 DSH 校验目标包名及版本。
-已安装且来源不同的成员通过 `removeBundle` 和 `installBundle` 切换，成功后保留原启停选择。
-安装或启用失败会显示原因，不自动回退到旧安装。
+## 双本地链接与开发模式
+
+Host 在 `Config` 中维护 `localDevEnabled`（默认 `false`）和 `localWorkspaceDir`（默认 `''`），
+并通过受浏览器会话鉴权的 `POST /api/dsh-atlas-local-dev` 路由提供状态探测与来源切换：
+
+- **Feature 1（包本体切本地）**：针对任意可管理的单插件或聚合包，
+  在基线来源与 `link:<localWorkspaceDir>/<basename>` 之间切换。
+- **Feature 2（聚合成员切本地）**：针对声明 `dsh.aggregate` 的聚合包，
+  在 profile 私有目录 `<profileDir>/dsh-atlas-local-dev/overlays/<safePkg>/<id>/` 合成 overlay，
+  用 `yaml` AST 重新生成 `cordis.patch.yml` 并链接本地直接成员，不写入用户源码目录。
+- 两者在聚合包上可正交组合成 4 种状态，每次切换保留原 `enabled` 状态、具备失败回滚和外部漂移保护，
+  并在切换完成后自动回收旧 overlay 目录。
+- `localDevEnabled` 关闭时，详情页 `plugins.detail.badge` 与 `plugins.detail.section` 直接返回 `null` 且不发起请求；
+  开启后在详情页自然底部位置（不使用 CSS `order` hack）按单包或聚合包分别显示控制项。
 
 成员已安装、已停用且可卸载时，成员开关旁显示红色垃圾桶。
 确认时重新检查成员状态，再调用 DSH 的 `removeBundle`。
