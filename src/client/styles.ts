@@ -49,13 +49,17 @@ export const CSS = `
 }
 .dsh-atlas-manager-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
+  gap: 0;
   padding: 10px 0;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 .dsh-atlas-manager-row:last-child { border-bottom: 0; }
+.dsh-atlas-manager-row-main {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
 .dsh-atlas-manager-icon {
   box-sizing: border-box;
   display: grid;
@@ -154,25 +158,13 @@ export const CSS = `
 @media (hover: hover) {
   .dsh-atlas-local-btn:enabled:hover { background: var(--dsw-alias-interactive-bg-hover); }
 }
-.dsh-atlas-section {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-.dsh-atlas-section + .dsh-atlas-section {
-  margin-top: 14px;
-}
-.dsh-atlas-settings-section {
-  padding-top: 14px;
-  border-top: 1px solid var(--dsw-alias-border-l1);
-}
-.dsh-atlas-section-toggle {
+.dsh-atlas-settings-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   max-width: 100%;
-  padding: 4px 6px;
-  margin-inline: -6px;
+  padding: 2px 6px;
+  margin-inline: -6px 0;
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -195,53 +187,12 @@ export const CSS = `
 [aria-expanded='true'] > .dsh-atlas-chevron {
   transform: rotate(90deg);
 }
-.dsh-atlas-settings-groups {
-  display: grid;
-  gap: 18px;
-  min-width: 0;
-  padding-top: 4px;
-}
-.dsh-atlas-settings-group {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-.dsh-atlas-settings-group + .dsh-atlas-settings-group {
-  padding-top: 16px;
-  border-top: 1px solid var(--dsw-alias-border-l1);
-}
-.dsh-atlas-settings-group-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-.dsh-atlas-settings-group-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1 1 auto;
-  padding: 3px 6px;
-  margin-inline: -6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-.dsh-atlas-settings-group-open {
+.dsh-atlas-detail-open {
   flex-shrink: 0;
   box-sizing: border-box;
-  width: 28px;
-  height: 28px;
-  display: grid;
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
   place-items: center;
   padding: 0;
   border: 0;
@@ -251,29 +202,24 @@ export const CSS = `
   cursor: pointer;
 }
 @media (hover: hover) {
-  .dsh-atlas-section-toggle:hover,
-  .dsh-atlas-settings-group-toggle:hover {
+  .dsh-atlas-settings-toggle:hover {
     background: var(--dsw-alias-interactive-bg-hover);
   }
-  .dsh-atlas-settings-group-open:hover {
+  .dsh-atlas-detail-open:hover {
     color: var(--dsw-alias-brand-primary);
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }
-.dsh-atlas-settings-group-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--dsw-radius-sm);
-}
-.dsh-atlas-settings-group-body {
-  margin-left: 14px;
+.dsh-atlas-settings-body {
+  margin-top: 10px;
+  margin-left: 20px;
   padding-left: 20px;
   border-left: 1px solid var(--dsw-alias-border-l2);
   min-width: 0;
 }
 @media (max-width: 520px) {
-  .dsh-atlas-settings-group-body {
-    margin-left: 8px;
+  .dsh-atlas-settings-body {
+    margin-left: 10px;
     padding-left: 12px;
   }
 }
@@ -375,8 +321,7 @@ export const CSS = `
 .dsh-atlas-manager-switch:focus-visible, .dsh-atlas-manager-retry:focus-visible,
 .dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible,
 .dsh-atlas-local-btn:focus-visible, .dsh-atlas-manager-link:focus-visible,
-.dsh-atlas-section-toggle:focus-visible, .dsh-atlas-settings-group-toggle:focus-visible,
-.dsh-atlas-settings-group-open:focus-visible {
+.dsh-atlas-settings-toggle:focus-visible, .dsh-atlas-detail-open:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: 2px;
 }

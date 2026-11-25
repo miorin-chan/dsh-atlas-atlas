@@ -87,8 +87,6 @@ const en = {
   'localDevError_overlay-failed': 'Couldn’t build the local members overlay.',
   'localDevError_switch-failed': 'Couldn’t switch the bundle source.',
   'localDevError_rollback-failed': 'Source switch and automatic rollback both failed.',
-  bundleSettings: 'Settings ({count})',
-  bundleSettingsPlain: 'Settings',
   openBundleDetails: 'Open {name} details',
 }
 
@@ -187,8 +185,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': '生成本地成员 overlay 失败。',
     'localDevError_switch-failed': '切换包来源失败。',
     'localDevError_rollback-failed': '切换失败且自动回滚失败。',
-    bundleSettings: '设置（{count}）',
-    bundleSettingsPlain: '设置',
     openBundleDetails: '打开{name}详情页',
   },
   ja: {
@@ -278,8 +274,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': 'メンバーオーバーレイの作成に失敗しました。',
     'localDevError_switch-failed': 'ソースの切り替えに失敗しました。',
     'localDevError_rollback-failed': '切り替えとロールバックの両方に失敗しました。',
-    bundleSettings: '設定 ({count})',
-    bundleSettingsPlain: '設定',
     openBundleDetails: '{name}の詳細を開く',
   },
   de: {
@@ -369,8 +363,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': 'Lokales Mitglieder-Overlay konnte nicht erstellt werden.',
     'localDevError_switch-failed': 'Quellenwechsel fehlgeschlagen.',
     'localDevError_rollback-failed': 'Wechsel und automatischer Rollback fehlgeschlagen.',
-    bundleSettings: 'Einstellungen ({count})',
-    bundleSettingsPlain: 'Einstellungen',
     openBundleDetails: 'Details zu {name} öffnen',
   },
   es: {
@@ -460,8 +452,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': 'No se pudo crear la superposición local.',
     'localDevError_switch-failed': 'Error al cambiar el origen.',
     'localDevError_rollback-failed': 'Falló el cambio y también la reversión.',
-    bundleSettings: 'Configuración ({count})',
-    bundleSettingsPlain: 'Configuración',
     openBundleDetails: 'Abrir detalles de {name}',
   },
   fr: {
@@ -551,8 +541,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': 'Impossible de préparer la superposition locale.',
     'localDevError_switch-failed': 'Échec du changement de source.',
     'localDevError_rollback-failed': 'Échec du changement et du retour arrière.',
-    bundleSettings: 'Paramètres ({count})',
-    bundleSettingsPlain: 'Paramètres',
     openBundleDetails: 'Ouvrir les détails de {name}',
   },
   pt: {
@@ -642,8 +630,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': 'Não foi possível montar o overlay local.',
     'localDevError_switch-failed': 'Falha ao alternar a origem.',
     'localDevError_rollback-failed': 'Falha na troca e na reversão automática.',
-    bundleSettings: 'Configurações ({count})',
-    bundleSettingsPlain: 'Configurações',
     openBundleDetails: 'Abrir detalhes de {name}',
   },
   ru: {
@@ -733,8 +719,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_overlay-failed': 'Не удалось собрать локальное наложение.',
     'localDevError_switch-failed': 'Не удалось переключить источник.',
     'localDevError_rollback-failed': 'Не удалось переключить источник и выполнить откат.',
-    bundleSettings: 'Настройки ({count})',
-    bundleSettingsPlain: 'Настройки',
     openBundleDetails: 'Открыть страницу {name}',
   },
 }
