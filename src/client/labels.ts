@@ -88,6 +88,8 @@ const en = {
   'localDevError_switch-failed': 'Couldn’t switch the bundle source.',
   'localDevError_rollback-failed': 'Source switch and automatic rollback both failed.',
   openBundleDetails: 'Open {name} details',
+  expandAll: 'Expand all',
+  collapseAll: 'Collapse all',
 }
 
 export type AtlasLabelKey = keyof typeof en
@@ -186,6 +188,8 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': '切换包来源失败。',
     'localDevError_rollback-failed': '切换失败且自动回滚失败。',
     openBundleDetails: '打开{name}详情页',
+    expandAll: '展开全部',
+    collapseAll: '折叠全部',
   },
   ja: {
     uninstall: 'アンインストール',
@@ -275,6 +279,8 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': 'ソースの切り替えに失敗しました。',
     'localDevError_rollback-failed': '切り替えとロールバックの両方に失敗しました。',
     openBundleDetails: '{name}の詳細を開く',
+    expandAll: 'すべて展開',
+    collapseAll: 'すべて折りたたむ',
   },
   de: {
     uninstall: 'Deinstallieren',
@@ -364,6 +370,8 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': 'Quellenwechsel fehlgeschlagen.',
     'localDevError_rollback-failed': 'Wechsel und automatischer Rollback fehlgeschlagen.',
     openBundleDetails: 'Details zu {name} öffnen',
+    expandAll: 'Alle aufklappen',
+    collapseAll: 'Alle zuklappen',
   },
   es: {
     uninstall: 'Desinstalar',
@@ -453,6 +461,8 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': 'Error al cambiar el origen.',
     'localDevError_rollback-failed': 'Falló el cambio y también la reversión.',
     openBundleDetails: 'Abrir detalles de {name}',
+    expandAll: 'Expandir todo',
+    collapseAll: 'Contraer todo',
   },
   fr: {
     uninstall: 'Désinstaller',
@@ -542,6 +552,8 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': 'Échec du changement de source.',
     'localDevError_rollback-failed': 'Échec du changement et du retour arrière.',
     openBundleDetails: 'Ouvrir les détails de {name}',
+    expandAll: 'Tout développer',
+    collapseAll: 'Tout réduire',
   },
   pt: {
     uninstall: 'Desinstalar',
@@ -631,6 +643,8 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': 'Falha ao alternar a origem.',
     'localDevError_rollback-failed': 'Falha na troca e na reversão automática.',
     openBundleDetails: 'Abrir detalhes de {name}',
+    expandAll: 'Expandir tudo',
+    collapseAll: 'Recolher tudo',
   },
   ru: {
     uninstall: 'Удалить',
@@ -720,5 +734,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_switch-failed': 'Не удалось переключить источник.',
     'localDevError_rollback-failed': 'Не удалось переключить источник и выполнить откат.',
     openBundleDetails: 'Открыть страницу {name}',
+    expandAll: 'Развернуть всё',
+    collapseAll: 'Свернуть всё',
   },
 }

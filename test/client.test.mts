@@ -575,8 +575,24 @@ test('expands indented aggregate settings inline under bundle title subheadings 
       { name: 'dsh-aggregate.config:@miorin/dsh-atlas-visual', inputProps: { view: 'page', canToggle: true } },
     ])
 
-    // Expanding Custom Bundle as well renders its indented settings inline beneath its row.
-    await act(async () => { customToggle.props.onClick() })
+    // Expand-all button above bundles expands every expandable bundle and passes expandCommand.
+    const expandAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
+    assert.deepEqual(expandAllBtn.children, ['expandAll'])
+    await act(async () => { expandAllBtn.props.onClick() })
+    assert.deepEqual(view!.root.findByProps({ 'data-atlas-expand-all': '' }).children, ['collapseAll'])
+    assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }))
+    assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }))
+    assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }))
+    assert.deepEqual(factoryCalls.slice(-1)[0]?.inputProps.expandCommand, { action: 'expand', seq: 1 })
+    await act(async () => { view!.root.findByProps({ 'data-atlas-expand-all': '' }).props.onClick() })
+    assert.deepEqual(view!.root.findByProps({ 'data-atlas-expand-all': '' }).children, ['expandAll'])
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }).length, 0)
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }).length, 0)
+
+    // Re-expand Visual & Custom individually to verify individual toggles still work cleanly.
+    await act(async () => { view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' }).props.onClick() })
+    await act(async () => { view!.root.findByProps({ 'data-atlas-settings-toggle': '@local/custom-bundle' }).props.onClick() })
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }))
 
     // Clicking Visual Atlas subheading again collapses its inline settings.
@@ -811,6 +827,15 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
 
+    // Sub-aggregate detail page expand-all / collapse-all expands and collapses configurable members.
+    const detailExpandAll = renderer!.root.findByProps({ 'data-dsh-aggregate-expand-all': '@miorin/dsh-atlas-list' })
+    await act(async () => { detailExpandAll.props.onClick() })
+    assert.ok(renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }))
+    await act(async () => {
+      renderer!.root.findByProps({ 'data-dsh-aggregate-expand-all': '@miorin/dsh-atlas-list' }).props.onClick()
+    })
+    assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
+
     // 2. Switch to dsh-atlas-atlas panel -> ONE single list; List Atlas subheading starts collapsed and expands inline under its row.
     await act(async () => {
       setTargetKey!('@miorin/dsh-atlas-atlas')
@@ -852,6 +877,22 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
       renderer!.root.findByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' }).props.onClick()
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
+
+    // Clicking master expand-all expands List Atlas AND nested configurable settings in one click.
+    await act(async () => {
+      renderer!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-list' }).props.onClick()
+    })
+    assert.equal(renderer!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' }).length, 0)
+    await act(async () => {
+      renderer!.root.findByProps({ 'data-atlas-expand-all': '' }).props.onClick()
+      for (let i = 0; i < 6; i += 1) await Promise.resolve()
+    })
+    assert.ok(renderer!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' }))
+    assert.ok(renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }))
+    await act(async () => {
+      renderer!.root.findByProps({ 'data-atlas-expand-all': '' }).props.onClick()
+    })
+    assert.equal(renderer!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' }).length, 0)
 
     // 3. Dispose leaf plugin -> toggle disappears on watched-sessions, while List Atlas remains expandable for its sub-plugin list & switches.
     await act(async () => {

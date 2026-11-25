@@ -105,7 +105,11 @@ export function useAggregateSettingsMap(
 export function renderDynamicFactorySlot(
   renderFactorySlot: RenderFactorySlot,
   factoryName: string,
-  inputProps: { readonly view: 'summary' | 'page'; readonly canToggle?: boolean },
+  inputProps: {
+    readonly view: 'summary' | 'page'
+    readonly canToggle?: boolean
+    readonly expandCommand?: { readonly action: 'expand' | 'collapse'; readonly seq: number }
+  },
 ): ReactNode {
   return (renderFactorySlot as unknown as (name: string, props: Record<string, unknown>) => ReactNode)(
     factoryName,

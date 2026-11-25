@@ -27,12 +27,37 @@ export const CSS = `
 }
 .dsh-atlas-manager-path-controls > button { margin-top: 0; }
 .dsh-atlas-manager-path-controls > button:disabled { cursor: default; opacity: 0.55; }
+.dsh-atlas-manager-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
 .dsh-atlas-manager-heading {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 14px;
   line-height: 20px;
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
+}
+.dsh-atlas-expand-all {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .dsh-atlas-expand-all:hover {
+    color: var(--dsw-alias-label-primary);
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 .dsh-atlas-manager-subheading {
   margin: 14px 0 4px;
@@ -294,7 +319,7 @@ export const CSS = `
 .dsh-atlas-manager-switch:focus-visible, .dsh-atlas-manager-retry:focus-visible,
 .dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible,
 .dsh-atlas-local-btn:focus-visible,
-.dsh-atlas-settings-toggle:focus-visible, .dsh-atlas-detail-open:focus-visible {
+.dsh-atlas-settings-toggle:focus-visible, .dsh-atlas-detail-open:focus-visible, .dsh-atlas-expand-all:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: 2px;
 }

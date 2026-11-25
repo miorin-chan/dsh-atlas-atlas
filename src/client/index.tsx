@@ -333,6 +333,7 @@ export function apply(ctx: ClientContext): void {
     const [localDevBusy, setLocalDevBusy] = useState(false)
     const [localDevError, setLocalDevError] = useState<{ packageName: string; code: LocalDevErrorCode; detail?: string }>()
     const [expandedBundles, setExpandedBundles] = useState<Readonly<Record<string, true>>>({})
+    const [expandCommand, setExpandCommand] = useState<{ readonly action: 'expand' | 'collapse'; readonly seq: number }>()
     const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
     useSyncExternalStore(subscribeLocale, localeSnapshot)
     const listId = useId()
@@ -464,13 +465,41 @@ export function apply(ctx: ClientContext): void {
 
     const statusByPackage = new Map((overview?.aggregateBundles ?? []).map(item => [item.packageName, item]))
     const openBundle = (packageName: string) => { getPluginNavigation()?.openBundle(packageName) }
+    const expandablePackages = typeof renderFactorySlot === 'function'
+      ? [
+        ...ATLASES.map(atlas => {
+          const packageName = ATLAS_BUNDLES[atlas]
+          const bundle = inventory.find(item => item.name === packageName)
+          return bundle?.enabled === true && settingsByPackage.has(packageName) ? packageName : undefined
+        }),
+        ...discoveredAggregates.map(item =>
+          item.enabled && settingsByPackage.has(item.packageName) ? item.packageName : undefined,
+        ),
+      ].filter((pkg): pkg is string => pkg !== undefined)
+      : []
+    const allExpanded = expandablePackages.length > 0 && expandablePackages.every(pkg => Boolean(expandedBundles[pkg]))
+
     const toggleExpanded = (packageName: string) => {
+      setExpandCommand(undefined)
       setExpandedBundles(prev => {
         const next = { ...prev }
         if (next[packageName]) delete next[packageName]
         else next[packageName] = true
         return next
       })
+    }
+
+    const toggleExpandAll = () => {
+      if (expandablePackages.length === 0) return
+      const nextAction = allExpanded ? 'collapse' : 'expand'
+      setExpandCommand(prev => ({ action: nextAction, seq: (prev?.seq ?? 0) + 1 }))
+      if (nextAction === 'collapse') {
+        setExpandedBundles({})
+        return
+      }
+      const nextExpanded: Record<string, true> = {}
+      for (const pkg of expandablePackages) nextExpanded[pkg] = true
+      setExpandedBundles(nextExpanded)
     }
 
     const countBundleMembers = (bundle: BundleInfo | undefined, fallbackCount?: number): number | undefined => {
@@ -576,7 +605,19 @@ export function apply(ctx: ClientContext): void {
           {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('localDevApplyFailed')}</p>}
         </section>
 
-        <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
+        <div className="dsh-atlas-manager-heading-row">
+          <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
+          {expandablePackages.length > 0 && (
+            <button
+              type="button"
+              className="dsh-atlas-expand-all"
+              data-atlas-expand-all=""
+              onClick={toggleExpandAll}
+            >
+              {t(allExpanded ? 'collapseAll' : 'expandAll')}
+            </button>
+          )}
+        </div>
         <ul className="dsh-atlas-manager-list" data-atlas-panel="bundles" aria-labelledby={listId}>
           {ATLASES.map(atlas => {
             const packageName = ATLAS_BUNDLES[atlas]
@@ -688,6 +729,7 @@ export function apply(ctx: ClientContext): void {
                     {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, {
                       view: 'page',
                       canToggle: canToggleMembers,
+                      ...(expandCommand !== undefined ? { expandCommand } : {}),
                     })}
                   </div>
                 )}
@@ -762,6 +804,7 @@ export function apply(ctx: ClientContext): void {
                         {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, {
                           view: 'page',
                           canToggle: canToggleMembers,
+                          ...(expandCommand !== undefined ? { expandCommand } : {}),
                         })}
                       </div>
                     )}
