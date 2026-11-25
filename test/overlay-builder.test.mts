@@ -138,3 +138,65 @@ test('rejects missing member checkout and volatile profile-owned non-member depe
     (err: unknown) => err instanceof LocalDevError && err.code === 'overlay-failed' && /prune/i.test(err.message),
   )
 })
+
+test('applies dsh.aggregate.defaults when regenerating local-dev overlay patch', async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-overlay-defaults-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const profileDir = join(root, 'profile')
+  const workspaceDir = join(root, 'workspace')
+  const installedDir = join(root, 'installed-agg')
+  mkdirSync(profileDir, { recursive: true })
+  mkdirSync(installedDir, { recursive: true })
+
+  // Local member-a has disabled: true in its own patch, but aggregate default is true (should strip).
+  writePlugin(
+    join(workspaceDir, 'member-a'),
+    '@miorin/member-a',
+    `- insert:\n    - id: member-a\n      name: '@miorin/member-a'\n      disabled: true\n`,
+  )
+  // Local member-b has no disabled key, but aggregate default is false (should add disabled: true).
+  writePlugin(
+    join(workspaceDir, 'member-b'),
+    '@miorin/member-b',
+    `- insert:\n    - id: member-b\n      name: '@miorin/member-b'\n`,
+  )
+
+  writeFileSync(join(installedDir, 'index.js'), 'export const name = "@miorin/dsh-atlas-demo"; export function apply() {}\n')
+  writeFileSync(join(installedDir, 'client.js'), 'window.__ModuleLoader__.load({ id: "@miorin/dsh-atlas-demo", factory: () => ({}) });\n')
+  writeFileSync(join(installedDir, 'cordis.patch.yml'), '- insert:\n    - id: dsh-atlas-demo\n      name: "@miorin/dsh-atlas-demo"\n')
+  writeFileSync(join(installedDir, 'package.json'), `${JSON.stringify({
+    name: '@miorin/dsh-atlas-demo',
+    version: '0.1.0',
+    type: 'module',
+    exports: { '.': './index.js', './client': './client.js' },
+    dependencies: {
+      '@miorin/member-a': '0.1.0',
+      '@miorin/member-b': '0.1.0',
+    },
+    dsh: {
+      bundle: { patch: './cordis.patch.yml' },
+      client: { platform: 'web', immediately: true },
+      aggregate: {
+        version: 1,
+        runtimeRowId: 'dsh-atlas-demo',
+        plugins: ['@miorin/member-a', '@miorin/member-b'],
+        defaults: { '@miorin/member-a': true, '@miorin/member-b': false },
+      },
+    },
+  }, null, 2)}\n`)
+
+  const store = new LocalDevStore(profileDir)
+  const baseBundle = await readCheckedBundle(installedDir, '@miorin/dsh-atlas-demo')
+  const built = await buildLocalMembersOverlay({ store, profileDir, baseBundle, workspaceDir })
+
+  const patchDoc = parseDocument(readFileSync(join(built.overlayDir, 'cordis.patch.yml'), 'utf8'))
+  assert.deepEqual(patchDoc.errors, [])
+  const rows = (patchDoc.contents as { items: Array<{ get: (k: string, keep?: boolean) => { items: Array<{ get: (k: string) => unknown; has: (k: string) => boolean }> } }> }).items[0].get('insert', true).items
+  assert.equal(rows[0].get('id'), 'member-a')
+  assert.equal(rows[0].has('disabled'), false)
+  assert.equal(rows[1].get('id'), 'member-b')
+  assert.equal(rows[1].get('disabled'), true)
+  assert.equal(rows[2].get('id'), 'dsh-atlas-demo')
+  assert.equal(rows[2].has('disabled'), false)
+})

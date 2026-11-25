@@ -9,6 +9,7 @@ export interface AggregateMetadata {
   readonly version: number
   readonly runtimeRowId: string
   readonly plugins: readonly string[]
+  readonly defaults?: Readonly<Record<string, boolean>>
 }
 
 export interface CheckedBundle {
@@ -117,7 +118,21 @@ export function parseAggregateMetadata(
   const runtimeRowId = typeof aggregate.runtimeRowId === 'string' && aggregate.runtimeRowId.trim() !== ''
     ? aggregate.runtimeRowId
     : packageBasename(packageName)
-  return { version, runtimeRowId, plugins }
+  let defaults: Record<string, boolean> | undefined
+  if (aggregate.defaults !== undefined) {
+    const rawDefaults = asRecord(aggregate.defaults)
+    if (!rawDefaults) throw new Error(`${packageName}: dsh.aggregate.defaults must be an object`)
+    const pluginSet = new Set(plugins)
+    const parsed: Record<string, boolean> = {}
+    for (const [key, val] of Object.entries(rawDefaults)) {
+      if (!pluginSet.has(key) || typeof val !== 'boolean') {
+        throw new Error(`${packageName}: dsh.aggregate.defaults must map member plugins to booleans`)
+      }
+      parsed[key] = val
+    }
+    defaults = parsed
+  }
+  return { version, runtimeRowId, plugins, ...(defaults !== undefined ? { defaults } : {}) }
 }
 
 export async function readCheckedBundle(dir: string, expectedName?: string): Promise<CheckedBundle> {

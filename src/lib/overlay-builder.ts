@@ -145,6 +145,7 @@ export async function buildLocalMembersOverlay(options: {
     if (rows.length === 0) {
       throw new LocalDevError('overlay-failed', `${member.name} patch inserts no rows`)
     }
+    const defaultEnabled = aggregate.defaults?.[member.name]
     for (const row of rows) {
       if (packageNameOf(row.name) !== member.name) {
         throw new LocalDevError('overlay-failed', `${member.name}: row "${row.id}" points to "${row.name}" instead of ${member.name}`)
@@ -154,7 +155,10 @@ export async function buildLocalMembersOverlay(options: {
         throw new LocalDevError('overlay-failed', `Duplicate loader row id "${row.id}" between ${prev} and ${member.name}`)
       }
       seenIds.set(row.id, member.name)
-      allRows.push({ node: row.node.clone() as YAMLMap, comment: ` ${member.name}`, id: row.id })
+      const cloned = row.node.clone() as YAMLMap
+      if (defaultEnabled === false) cloned.set('disabled', true)
+      else if (defaultEnabled === true) cloned.delete('disabled')
+      allRows.push({ node: cloned, comment: ` ${member.name}`, id: row.id })
     }
   }
 
