@@ -48,8 +48,30 @@ function SegmentedTabsStub({
     ),
   )
 }
+function SwitchStub({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+  disabled?: boolean
+}) {
+  return createElement('button', {
+    type: 'button',
+    role: 'switch',
+    'aria-label': label,
+    'aria-checked': checked,
+    disabled,
+    onClick: () => { if (!disabled) onChange(!checked) },
+  })
+}
 const plugin = registration.factory(id =>
-  id === '@deepseek-ai/dsh-client-ui-primitives' ? { SegmentedTabs: SegmentedTabsStub } : testRequire(id),
+  id === '@deepseek-ai/dsh-client-ui-primitives'
+    ? { SegmentedTabs: SegmentedTabsStub, Switch: SwitchStub }
+    : testRequire(id),
 )
 
 test('mounts bundle config, detail badge, and detail section slots and disposes cleanly', () => {
@@ -634,6 +656,7 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
         {
           rowId: 'watched-sessions',
           moduleName: '@miorin/dsh-watched-sessions',
+          entryId: 'entry-watched',
           meta: { title: { en: 'Watched Sessions', zh: '常驻会话' } },
         },
       ],
@@ -651,7 +674,12 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
   ctx.reflect.provide('remote', {
     pluginManager: {
       async listBundles() { return { ok: true, value: bundlesValue } },
-      async listPlugins() { return { ok: true, value: [] } },
+      async listPlugins() {
+        return {
+          ok: true,
+          value: [{ entryId: 'entry-watched', enabled: true, fiberPhase: 'active' }],
+        }
+      },
     },
     $on: () => () => {},
   } as never)
@@ -700,7 +728,18 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     console,
   })
   assert.equal(listEntry?.id, '@miorin/dsh-atlas-list')
-  const listPlugin = listEntry!.factory(id => id === 'react' ? ReactNamespace : appRequire(id))
+  const primitivesStub = {
+    SegmentedTabs: SegmentedTabsStub,
+    Switch: SwitchStub,
+    PluginArtworkSubagent: () => null,
+  }
+  const listPlugin = listEntry!.factory(id =>
+    id === 'react'
+      ? ReactNamespace
+      : id === '@deepseek-ai/dsh-client-ui-primitives'
+        ? primitivesStub
+        : appRequire(id),
+  )
   listPlugin.apply(ctx)
   plugin.apply(ctx as never)
 
@@ -719,7 +758,30 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
       await Promise.resolve()
     })
 
-    // 1. Standalone aggregate detail page renders leaf setting through FactoryOutlet.
+    // 1. Standalone aggregate detail page shows Sub-plugins & Settings tabs, switches, soft-fold style, and outline jump.
+    const listTabs = renderer!.root.findAllByProps({ role: 'tab' })
+    assert.equal(listTabs.length, 2)
+    assert.equal(listTabs[0].props['aria-selected'], true)
+    assert.ok(listTabs[0].findAll(n => n.children?.includes('Sub-plugins (1)')).length > 0)
+    assert.ok(listTabs[1].findAll(n => n.children?.includes('Settings (1)')).length > 0)
+
+    const pluginsPanel = renderer!.root.findByProps({ 'data-dsh-aggregate-panel': 'plugins' })
+    const memberSwitch = pluginsPanel.findByProps({ role: 'switch' })
+    assert.equal(memberSwitch.props['aria-checked'], true)
+    assert.equal(memberSwitch.props.disabled, false)
+
+    assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
+    const rawToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-raw-rows-toggle': '@miorin/dsh-atlas-list' })
+    assert.equal(rawToggle.props['aria-expanded'], false)
+    await act(async () => { rawToggle.props.onClick() })
+    assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 0)
+    assert.equal(renderer!.root.findByProps({ 'data-dsh-aggregate-raw-rows-toggle': '@miorin/dsh-atlas-list' }).props['aria-expanded'], true)
+    await act(async () => { rawToggle.props.onClick() })
+    assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
+
+    const jumpBtn = renderer!.root.findByProps({ 'data-dsh-aggregate-jump': '@miorin/dsh-watched-sessions' })
+    await act(async () => { jumpBtn.props.onClick() })
+    assert.ok(renderer!.root.findByProps({ 'data-dsh-aggregate-panel': 'settings' }))
     const standaloneLeaf = renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' })
     assert.deepEqual(standaloneLeaf.children, ['leaf-ns:watchMode=true'])
 
