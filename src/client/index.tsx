@@ -15,6 +15,7 @@ import {
   canUninstallAtlas,
   ENTRY_ID,
   isLocalOnlyAtlas,
+  normalizeWorkspaceDir,
   PACKAGE,
   setAtlasEnabled,
   uninstallAtlas,
@@ -67,9 +68,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 function isAbsoluteDirInput(path: string): boolean {
-  const trimmed = path.trim()
-  if (trimmed === '' || /[\u0000-\u001f]/u.test(trimmed)) return false
-  return trimmed.startsWith('/') || /^[a-z]:[\\/]|^\\\\[^\\]+\\[^\\]+/i.test(trimmed)
+  return normalizeWorkspaceDir(path) !== undefined
 }
 
 export function apply(ctx: ClientContext): void {
@@ -137,7 +136,11 @@ export function apply(ctx: ClientContext): void {
     const progress = (stage: Progress) => update({ activity: { atlas, stage } })
     progress(enabled ? 'enabling' : 'disabling')
     update({ notices: { ...snapshot.notices, [atlas]: undefined } })
-    const notice = await setAtlasEnabled(manager, atlas, enabled, progress)
+    const cfg = localDevForm.getSnapshot().value
+    const notice = await setAtlasEnabled(manager, atlas, enabled, progress, {
+      localDevEnabled: cfg?.localDevEnabled === true,
+      localWorkspaceDir: cfg?.localWorkspaceDir,
+    })
     update({ notices: { ...snapshot.notices, [atlas]: notice && { enabled, notice } } })
     await refresh()
     update({ activity: undefined })
@@ -158,7 +161,8 @@ export function apply(ctx: ClientContext): void {
 
   function NoticeLine({ notice }: { notice: Notice }) {
     const { kind } = notice
-    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'conflict' || kind === 'continuityConflict' || kind === 'uninstallUnavailable'
+    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'localWorkspaceRequired'
+      || kind === 'conflict' || kind === 'continuityConflict' || kind === 'uninstallUnavailable'
     const message = notice.kind === 'conflict' ? t('conflict', { bundle: notice.bundle, row: notice.row }) : t(kind)
     return <p className="dsh-atlas-manager-status" data-atlas-status={kind} data-error={error ? '' : undefined}>{message}</p>
   }
@@ -236,6 +240,7 @@ export function apply(ctx: ClientContext): void {
     const canList = useRemoteAccess('pluginManager/listBundles')
     const canToggle = useRemoteAccess('pluginManager/setBundleEnabled')
     const canInstall = useRemoteAccess('pluginManager/installBundle')
+    const canInspect = useRemoteAccess('pluginManager/inspect')
     const canRemove = useRemoteAccess('pluginManager/removeBundle')
     const settings = useSyncExternalStore(subscribeForm, formSnapshot, formSnapshot)
     const [draft, setDraft] = useState<string>()
@@ -307,6 +312,7 @@ export function apply(ctx: ClientContext): void {
     const busy = saving || localDevBusy || activity !== undefined
     const canEdit = settings.status === 'ready' && settings.writable
     const canSwitchLocal = canInstall && canRemove
+    const savedWorkspaceDir = normalizeWorkspaceDir(settings.value?.localWorkspaceDir)
     const pathValid = workspaceDir.trim() === '' || isAbsoluteDirInput(workspaceDir)
     const pathDirty = settings.status === 'ready' && workspaceDir.trim() !== (settings.value?.localWorkspaceDir ?? '')
     const pathId = `${listId}-workspace-dir`
@@ -432,8 +438,10 @@ export function apply(ctx: ClientContext): void {
             const localStatus = statusByPackage.get(packageName)
             const enabled = bundle?.enabled ?? false
             const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
-            const localInstallRequired = notInstalled && isLocalOnlyAtlas(atlas)
-            const denied = !canToggle || bundle?.readOnlyReason !== undefined || (!enabled && notInstalled && !canInstall)
+            const localInstallRequired = notInstalled && !localDevEnabled && isLocalOnlyAtlas(atlas)
+            const localWorkspaceRequired = notInstalled && localDevEnabled && savedWorkspaceDir === undefined
+            const denied = !canToggle || bundle?.readOnlyReason !== undefined
+              || (!enabled && notInstalled && (!canInstall || (localDevEnabled && !canInspect)))
             const showUninstall = canRemove && canUninstallAtlas(bundle)
             const stage = activity?.atlas === atlas ? activity.stage : undefined
             const notice = stage === undefined ? notices[atlas]?.notice : undefined
@@ -464,6 +472,7 @@ export function apply(ctx: ClientContext): void {
                     {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
                     {atlas === 'continuity' && <p className="dsh-atlas-manager-status">{t('continuityMembers')}</p>}
                     {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired')}</p>}
+                    {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
                     {notice && <NoticeLine notice={notice} />}
                   </div>
                   {localDevEnabled && localStatus && (
@@ -497,10 +506,10 @@ export function apply(ctx: ClientContext): void {
                   </button>}
                   <button type="button" role="switch" className="dsh-atlas-manager-switch"
                     aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
-                    aria-busy={stage !== undefined} aria-disabled={busy || denied || localInstallRequired}
-                    disabled={denied || localInstallRequired}
+                    aria-busy={stage !== undefined} aria-disabled={busy || denied || localInstallRequired || localWorkspaceRequired}
+                    disabled={denied || localInstallRequired || localWorkspaceRequired}
                     onClick={() => {
-                      if (!busy && !denied && !localInstallRequired) {
+                      if (!busy && !denied && !localInstallRequired && !localWorkspaceRequired) {
                         void toggle(atlas, !enabled)
                       }
                     }}>

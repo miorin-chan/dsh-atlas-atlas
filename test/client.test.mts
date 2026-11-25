@@ -236,3 +236,103 @@ test('renders six Atlas switches, discovered aggregates, and gates detail contro
   }
   assert.equal(form.listeners.size, 0)
 })
+
+test('installs uninstalled Continuity from localWorkspaceDir on toggle in local mode and requires saved workspace dir', async () => {
+  const effects = []
+  const bundles = new Map<string, Record<string, unknown>>()
+  const remoteCalls: Array<{ op: string; arg: unknown; options?: unknown }> = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => ({
+    async json() {
+      return { ok: true, value: { enabled: true, workspaceDir: form.snapshot.value.localWorkspaceDir, workspaceDirValid: true, aggregateBundles: [] } }
+    },
+  }) as unknown as Response
+
+  const form = {
+    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: true, localWorkspaceDir: '' } },
+    listeners: new Set<() => void>(),
+    getSnapshot() { return this.snapshot },
+    subscribe(listener: () => void) {
+      this.listeners.add(listener)
+      return () => this.listeners.delete(listener)
+    },
+    async mutate() { return true },
+  }
+  const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
+  plugin.apply({
+    effect(install) { effects.push(install()) },
+    on: () => () => {},
+    remote: {
+      pluginManager: {
+        async listBundles() { return { ok: true, value: [...bundles.values()] } },
+        async inspect(spec: string) {
+          remoteCalls.push({ op: 'inspect', arg: spec })
+          return { ok: true, value: { status: 'accepted', kind: 'path', name: '@miorin/dsh-atlas-continuity', version: '0.1.0', bundle: true } }
+        },
+        async installBundle(spec: string, options: unknown) {
+          remoteCalls.push({ op: 'installBundle', arg: spec, options })
+          bundles.set('@miorin/dsh-atlas-continuity', {
+            name: '@miorin/dsh-atlas-continuity',
+            installed: true,
+            availability: 'profile',
+            enabled: false,
+            source: spec,
+            rows: [],
+          })
+          return { ok: true, value: { application: 'applied', changed: true } }
+        },
+        async setBundleEnabled(name: string, enabled: boolean) {
+          remoteCalls.push({ op: 'setBundleEnabled', arg: name, options: enabled })
+          bundles.set(name, { ...bundles.get(name), enabled })
+          return { ok: true, value: { application: 'applied', changed: true } }
+        },
+      },
+      $on: () => () => {},
+    },
+    configForms: { get: () => form },
+    locale: { bind: () => (key: string) => key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
+    slots: {
+      inject: (_: string, register: () => () => void) => register(),
+      register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
+        slots.set(options.name, render)
+        return () => {}
+      },
+    },
+  })
+
+  const Panel = slots.get('plugins.bundle.config')!
+  let view
+  try {
+    await act(async () => {
+      view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
+    })
+    const continuityBlocked = view.root.findAllByProps({ role: 'switch', 'aria-label': 'continuity' })[0]
+    assert.equal(continuityBlocked.props.disabled, true)
+    assert.ok(view.root.findAll(node => node.type === 'p' && node.children.includes('localWorkspaceRequired')).length > 0)
+
+    await act(async () => {
+      form.snapshot = { ...form.snapshot, value: { localDevEnabled: true, localWorkspaceDir: '/repos/' } }
+      for (const listener of form.listeners) listener()
+    })
+    const continuityReady = view.root.findAllByProps({ role: 'switch', 'aria-label': 'continuity' })[0]
+    assert.equal(continuityReady.props.disabled, false)
+
+    await act(async () => {
+      continuityReady.props.onClick()
+    })
+    assert.deepEqual(remoteCalls, [
+      { op: 'inspect', arg: 'link:/repos/dsh-atlas-continuity' },
+      {
+        op: 'installBundle',
+        arg: 'link:/repos/dsh-atlas-continuity',
+        options: { enabled: false, expected: { name: '@miorin/dsh-atlas-continuity', version: '0.1.0' } },
+      },
+      { op: 'setBundleEnabled', arg: '@miorin/dsh-atlas-continuity', options: true },
+    ])
+    assert.equal(bundles.get('@miorin/dsh-atlas-continuity')?.enabled, true)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (view !== undefined) act(() => view.unmount())
+    for (const dispose of effects.reverse()) dispose()
+  }
+})

@@ -9,9 +9,12 @@ Open **Plugins → Atlas Modular Improvement Plan** to toggle bundles or manage 
 
 The manager requires DSH `0.2.2-rc.5` or newer.
 DSH checks each member bundle's version requirements when it installs.
-When you turn on a bundle, the manager reuses the existing installation, including a local link.
-Continuity Atlas is local only; disable standalone VCS Panel and Sideby Note bundles before enabling Continuity.
-Published bundles can be installed from npm.
+When you turn on a bundle, the manager reuses the existing installation (including a local link
+or overlay) without overwriting its source.
+By default, unpublished Continuity Atlas is local only and published bundles install from npm;
+when **Enable local repository links** is turned on with a saved workspace directory, turning on any uninstalled bundle
+(including Continuity) installs directly from `link:<workspace>/dsh-atlas-<atlas>` instead of falling back to npm.
+Disable standalone VCS Panel and Sideby Note bundles before enabling Continuity.
 Turning a bundle off keeps the installed copy and its plugin settings.
 
 For local development, turn on **Enable local repository links**

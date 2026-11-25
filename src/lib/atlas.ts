@@ -20,14 +20,35 @@ export function isLocalOnlyAtlas(atlas: Atlas): atlas is LocalAtlas {
 
 export type Manager = Pick<ClientRemote['pluginManager'], 'listBundles' | 'installBundle' | 'setBundleEnabled' | 'inspect' | 'removeBundle'>
 export const ENTRY_ID = 'dsh-atlas-atlas'
+export interface LocalInstallOptions {
+  readonly localDevEnabled: boolean
+  readonly localWorkspaceDir?: string
+}
 
 export type Progress = 'installing' | 'enabling' | 'disabling' | 'uninstalling'
-export type Failure = 'installFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
+export type Failure = 'installFailed' | 'localLinkFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
 export type Notice =
-  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'localInstallRequired' | 'uninstallUnavailable' }
+  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'localInstallRequired' | 'localWorkspaceRequired' | 'uninstallUnavailable' }
   | { kind: Failure; detail?: string }
   | { kind: 'conflict'; bundle: string; row: string }
   | { kind: 'continuityConflict' }
+
+export function normalizeWorkspaceDir(input: string | undefined): string | undefined {
+  if (input === undefined) return undefined
+  const trimmed = input.trim()
+  if (trimmed === '' || /[\u0000-\u001f]/u.test(trimmed)) return undefined
+  if (!trimmed.startsWith('/') && !/^[a-z]:[\\/]|^\\\\[^\\]+\\[^\\]+/i.test(trimmed)) return undefined
+  if (trimmed === '/' || /^[a-z]:[\\/]$/i.test(trimmed)) return trimmed
+  return trimmed.replace(/[\\/]+$/, '') || '/'
+}
+
+export function localAtlasSpec(workspaceDir: string, atlas: Atlas): string {
+  const name = ATLAS_BUNDLES[atlas]
+  const basename = name.includes('/') ? name.slice(name.indexOf('/') + 1) : name
+  const sep = workspaceDir.includes('\\') && !workspaceDir.includes('/') ? '\\' : '/'
+  const base = workspaceDir.endsWith('/') || workspaceDir.endsWith('\\') ? workspaceDir : `${workspaceDir}${sep}`
+  return `link:${base}${basename}`
+}
 
 const NPM_REGISTRY = 'https://registry.npmjs.org/'
 
@@ -96,9 +117,11 @@ export async function setAtlasEnabled(
   atlas: Atlas,
   enabled: boolean,
   progress: (stage: Progress) => void,
+  local?: LocalInstallOptions,
 ): Promise<Notice | undefined> {
   const name = ATLAS_BUNDLES[atlas]
   let failure: Failure = 'inventoryFailed'
+  let restart: Notice | undefined
   try {
     let inventory = resultValue(await manager.listBundles())
     let bundle = inventory.find(item => item.name === name)
@@ -106,25 +129,57 @@ export async function setAtlasEnabled(
 
     if (enabled && (bundle === undefined || bundle.availability === 'missing')) {
       if (bundle?.installed) return { kind: 'bundleMissing' }
-      if (isLocalOnlyAtlas(atlas)) return { kind: 'localInstallRequired' }
-      progress('installing')
-      failure = 'installFailed'
-      const result = resultValue(await manager.installBundle(name, {
-        registry: NPM_REGISTRY,
-        saveExact: true,
-        enabled: false,
-      }))
-      if (result.error?.code !== 'already-installed' && result.application !== 'restart-required') {
-        const notice = outcome(result, failure)
-        if (notice !== undefined) return notice
+      if (local?.localDevEnabled === true) {
+        const workspaceDir = normalizeWorkspaceDir(local.localWorkspaceDir)
+        if (workspaceDir === undefined) return { kind: 'localWorkspaceRequired' }
+        const spec = localAtlasSpec(workspaceDir, atlas)
+        progress('installing')
+        failure = 'localLinkFailed'
+        const inspection = resultValue(await manager.inspect(spec))
+        if (inspection.status !== 'accepted' || inspection.kind !== 'path' || inspection.name !== name
+          || inspection.bundle !== true || !inspection.version) {
+          return { kind: 'localLinkFailed', detail: inspection.status === 'refused' ? inspection.reason : spec }
+        }
+        const result = resultValue(await manager.installBundle(spec, {
+          enabled: false,
+          expected: { name, version: inspection.version },
+        }))
+        if (result.application === 'restart-required') {
+          restart = { kind: 'restart' }
+        } else if (result.error?.code !== 'already-installed') {
+          const notice = outcome(result, failure)
+          if (notice !== undefined) return notice
+        }
+        failure = 'inventoryFailed'
+        inventory = resultValue(await manager.listBundles())
+        bundle = inventory.find(item => item.name === name)
+        if (bundle === undefined || bundle.availability === 'missing') {
+          return restart ?? { kind: 'localLinkFailed', detail: spec }
+        }
+        if (bundle.enabled) return restart
+      } else {
+        if (isLocalOnlyAtlas(atlas)) return { kind: 'localInstallRequired' }
+        progress('installing')
+        failure = 'installFailed'
+        const result = resultValue(await manager.installBundle(name, {
+          registry: NPM_REGISTRY,
+          saveExact: true,
+          enabled: false,
+        }))
+        if (result.application === 'restart-required') {
+          restart = { kind: 'restart' }
+        } else if (result.error?.code !== 'already-installed') {
+          const notice = outcome(result, failure)
+          if (notice !== undefined) return notice
+        }
+        failure = 'inventoryFailed'
+        inventory = resultValue(await manager.listBundles())
+        bundle = inventory.find(item => item.name === name)
+        if (bundle === undefined || bundle.availability === 'missing') {
+          return restart ?? { kind: 'installFailed', detail: name }
+        }
+        if (bundle.enabled) return restart
       }
-      failure = 'inventoryFailed'
-      inventory = resultValue(await manager.listBundles())
-      bundle = inventory.find(item => item.name === name)
-      if (bundle === undefined || bundle.availability === 'missing') {
-        return result.application === 'restart-required' ? { kind: 'restart' } : { kind: 'installFailed', detail: name }
-      }
-      if (bundle.enabled) return
     }
 
     if (enabled && bundle !== undefined) {
@@ -138,7 +193,7 @@ export async function setAtlasEnabled(
     if (enabled && result.application === 'failed' && result.changed) {
       return await restoreSelection(manager, name, result)
     }
-    return outcome(result, failure)
+    return outcome(result, failure) ?? restart
   } catch (error) {
     return { kind: failure, detail: error instanceof Error ? error.message : String(error) }
   }

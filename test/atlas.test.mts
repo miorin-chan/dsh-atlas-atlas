@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ATLAS_BUNDLES, PACKAGE, canUninstallAtlas, isLocalOnlyAtlas, setAtlasEnabled, uninstallAtlas } from '../lib/atlas.js'
+import {
+  ATLAS_BUNDLES,
+  PACKAGE,
+  canUninstallAtlas,
+  isLocalOnlyAtlas,
+  localAtlasSpec,
+  normalizeWorkspaceDir,
+  setAtlasEnabled,
+  uninstallAtlas,
+} from '../lib/atlas.js'
 
 const workspace = ATLAS_BUNDLES.workspace
 const success = value => ({ ok: true, value })
@@ -14,9 +23,22 @@ function fixture(others = []) {
   const writes = []
   const manager = {
     listBundles: async () => success([...profile.values()]),
-    async installBundle(name, options) {
-      writes.push(['install', name, options])
-      profile.set(name, newBundle(name, { rows: [{ rowId: name === workspace ? 'workspace-switcher' : name }] }))
+    async inspect(spec) {
+      writes.push(['inspect', spec])
+      if (spec.startsWith('link:')) {
+        const parts = spec.slice(5).split(/[\\/]/).filter(Boolean)
+        const basename = parts[parts.length - 1] ?? ''
+        return success({ status: 'accepted', kind: 'path', name: `@miorin/${basename}`, version: '0.1.0', bundle: true })
+      }
+      return success({ status: 'accepted', kind: 'registry', name: spec, version: '0.1.0', bundle: true })
+    },
+    async installBundle(spec, options) {
+      writes.push(['install', spec, options])
+      const name = options?.expected?.name ?? spec
+      profile.set(name, newBundle(name, {
+        source: spec,
+        rows: [{ rowId: name === workspace ? 'workspace-switcher' : name }],
+      }))
       return applied
     },
     async setBundleEnabled(name, enabled) {
@@ -186,4 +208,99 @@ test('reports when a saved selection needs restart', async () => {
   const { manager } = fixture([newBundle(workspace)])
   manager.setBundleEnabled = async () => success({ application: 'restart-required', changed: true })
   assert.deepEqual(await setAtlasEnabled(manager, 'workspace', true, ignoreProgress), { kind: 'restart' })
+})
+
+test('installs and enables uninstalled Atlases including Continuity from localWorkspaceDir without npm when localDevEnabled is true', async () => {
+  assert.equal(normalizeWorkspaceDir('  /repos/plugins/  '), '/repos/plugins')
+  assert.equal(normalizeWorkspaceDir('relative/path'), undefined)
+  assert.equal(localAtlasSpec('/repos/plugins/', 'workspace'), 'link:/repos/plugins/dsh-atlas-workspace')
+  assert.equal(localAtlasSpec('C:\\work\\plugins\\', 'continuity'), 'link:C:\\work\\plugins\\dsh-atlas-continuity')
+
+  const { manager, profile, writes } = fixture()
+  const stages = []
+  assert.equal(
+    await setAtlasEnabled(manager, 'workspace', true, stage => stages.push(stage), {
+      localDevEnabled: true,
+      localWorkspaceDir: '/repos/plugins/',
+    }),
+    undefined,
+  )
+  assert.deepEqual(stages, ['installing', 'enabling'])
+  assert.equal(profile.get(workspace).source, 'link:/repos/plugins/dsh-atlas-workspace')
+  assert.equal(profile.get(workspace).enabled, true)
+  assert.deepEqual(writes.splice(0), [
+    ['inspect', 'link:/repos/plugins/dsh-atlas-workspace'],
+    ['install', 'link:/repos/plugins/dsh-atlas-workspace', { enabled: false, expected: { name: workspace, version: '0.1.0' } }],
+    ['set', workspace, true],
+  ])
+
+  const continuity = ATLAS_BUNDLES.continuity
+  assert.equal(
+    await setAtlasEnabled(manager, 'continuity', true, ignoreProgress, {
+      localDevEnabled: true,
+      localWorkspaceDir: 'C:\\work\\plugins\\',
+    }),
+    undefined,
+  )
+  assert.equal(profile.get(continuity).source, 'link:C:\\work\\plugins\\dsh-atlas-continuity')
+  assert.equal(profile.get(continuity).enabled, true)
+  assert.deepEqual(writes, [
+    ['inspect', 'link:C:\\work\\plugins\\dsh-atlas-continuity'],
+    ['install', 'link:C:\\work\\plugins\\dsh-atlas-continuity', { enabled: false, expected: { name: continuity, version: '0.1.0' } }],
+    ['set', continuity, true],
+  ])
+})
+
+test('blocks enabling uninstalled Atlases without npm fallback when localDevEnabled is true and localWorkspaceDir is missing or invalid', async () => {
+  const { manager, profile, writes } = fixture()
+  for (const localWorkspaceDir of [undefined, '', '   ', 'relative/plugins']) {
+    for (const atlas of ['workspace', 'continuity']) {
+      assert.deepEqual(
+        await setAtlasEnabled(manager, atlas, true, ignoreProgress, { localDevEnabled: true, localWorkspaceDir }),
+        { kind: 'localWorkspaceRequired' },
+      )
+    }
+  }
+  assert.deepEqual(writes, [])
+  assert.equal(profile.has(workspace), false)
+  assert.equal(profile.has(ATLAS_BUNDLES.continuity), false)
+})
+
+test('surfaces localLinkFailed without npm fallback when local checkout inspection fails', async () => {
+  const { manager, profile, writes } = fixture()
+  manager.inspect = async spec => {
+    writes.push(['inspect', spec])
+    return success({ status: 'refused', reason: 'missing package.json' })
+  }
+  assert.deepEqual(
+    await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, { localDevEnabled: true, localWorkspaceDir: '/repos' }),
+    { kind: 'localLinkFailed', detail: 'missing package.json' },
+  )
+  assert.deepEqual(writes.splice(0), [['inspect', 'link:/repos/dsh-atlas-workspace']])
+
+  manager.inspect = async spec => {
+    writes.push(['inspect', spec])
+    return success({ status: 'accepted', kind: 'registry', name: workspace, version: '0.1.0', bundle: true })
+  }
+  assert.deepEqual(
+    await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, { localDevEnabled: true, localWorkspaceDir: '/repos' }),
+    { kind: 'localLinkFailed', detail: 'link:/repos/dsh-atlas-workspace' },
+  )
+  assert.deepEqual(writes, [['inspect', 'link:/repos/dsh-atlas-workspace']])
+  assert.equal(profile.has(workspace), false)
+})
+
+test('preserves existing baseline npm source when toggling an installed Atlas in local mode', async () => {
+  const existing = newBundle(workspace, { source: `${workspace}@0.1.0`, update: 'registry', version: '0.1.0', enabled: false })
+  const { manager, profile, writes } = fixture([existing])
+  assert.equal(
+    await setAtlasEnabled(manager, 'workspace', true, ignoreProgress, { localDevEnabled: true, localWorkspaceDir: '/repos' }),
+    undefined,
+  )
+  assert.equal(
+    await setAtlasEnabled(manager, 'workspace', false, ignoreProgress, { localDevEnabled: true, localWorkspaceDir: '/repos' }),
+    undefined,
+  )
+  assert.equal(profile.get(workspace).source, `${workspace}@0.1.0`)
+  assert.deepEqual(writes, [['set', workspace, true], ['set', workspace, false]])
 })

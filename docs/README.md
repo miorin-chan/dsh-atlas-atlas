@@ -15,11 +15,14 @@
 并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
 
-开启尚未安装的成员包时，管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，保存实际安装的精确版本。
+开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，
+保存实际安装的精确版本；脉络作为本地成员在此模式下仅显示本地安装提示，不尝试请求 npm。
+开启「启用本地仓库链接」并保存有效的 `localWorkspaceDir` 后，
+开启尚未安装的成员包（含脉络）直接校验并安装 `link:<localWorkspaceDir>/dsh-atlas-<atlas>`，
+不回退到 npm（未保存有效目录时拦截并提示配置）；对已安装的成员包做启停切换则始终保留当前安装来源。
 安装后先读取目标 bundle，检查行 ID 是否已由其他启用的 bundle 定义，再保存启用状态。
 若启用在保存选择后失败，管理卡尝试恢复停用状态并报告结果。
-默认模式下，再次开启和关闭都使用 `setBundleEnabled`，复用已有安装和逐项设置。
-脉络是本地成员，尚未安装时显示本地安装提示，不尝试请求 npm。
+默认与本地模式下，再次开启和关闭已安装成员都直接调用 `setBundleEnabled`，复用已有安装与逐项设置。
 
 ## 双本地链接与开发模式
 
