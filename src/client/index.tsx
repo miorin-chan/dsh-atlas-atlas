@@ -6,10 +6,14 @@ import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginConfigViewProps, PluginDetailProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  renderDynamicFactorySlot,
+  useAggregateSettingsMap,
+} from './aggregate-settings.js'
 import {
   ATLAS_BUNDLES,
   canUninstallAtlas,
@@ -52,7 +56,9 @@ type ClientContext = Pick<Context, 'effect' | 'on'> & {
   remote: ClientRemote
   configForms: Context['configForms']
 }
-type PanelProps = PluginConfigViewProps & Pick<PropsRuntime<typeof CONFIG_SLOT>, 'useRemoteAccess'>
+type PanelProps = PluginConfigViewProps
+  & Pick<PropsRuntime<typeof CONFIG_SLOT>, 'useRemoteAccess'>
+  & Partial<PropsRenderFactories>
 type DetailBadgeSlotProps = PluginDetailProps
 type DetailSectionSlotProps = PluginDetailProps & Pick<PropsRuntime<typeof DETAIL_SECTION_SLOT>, 'useRemoteAccess'>
 type Inventory = readonly BundleInfo[] | 'failed' | undefined
@@ -241,7 +247,50 @@ export function apply(ctx: ClientContext): void {
     )
   }
 
-  function AtlasPanel({ useRemoteAccess }: PanelProps) {
+  function SettingsToggleButton({
+    packageName,
+    count,
+    open,
+    panelId,
+    onToggle,
+  }: {
+    packageName: string
+    count: number | undefined
+    open: boolean
+    panelId: string
+    onToggle: () => void
+  }) {
+    return (
+      <div className="dsh-atlas-settings-toggle-row">
+        <button
+          type="button"
+          className="dsh-atlas-settings-toggle"
+          data-atlas-settings-toggle={packageName}
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={onToggle}
+        >
+          <svg
+            className="dsh-atlas-settings-chevron"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4.5 2.5 8 6l-3.5 3.5" />
+          </svg>
+          <span>{count !== undefined ? t('bundleSettings', { count }) : t('bundleSettingsPlain')}</span>
+        </button>
+      </div>
+    )
+  }
+
+  function AtlasPanel({ useRemoteAccess, renderFactorySlot }: PanelProps) {
     const canList = useRemoteAccess('pluginManager/listBundles')
     const canToggle = useRemoteAccess('pluginManager/setBundleEnabled')
     const canInstall = useRemoteAccess('pluginManager/installBundle')
@@ -258,12 +307,19 @@ export function apply(ctx: ClientContext): void {
     const [overview, setOverview] = useState<LocalDevOverview>()
     const [localDevBusy, setLocalDevBusy] = useState(false)
     const [localDevError, setLocalDevError] = useState<{ packageName: string; code: LocalDevErrorCode; detail?: string }>()
+    const [expandedSettings, setExpandedSettings] = useState<Readonly<Record<string, boolean>>>({})
     const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
     useSyncExternalStore(subscribeLocale, localeSnapshot)
     const listId = useId()
 
     const localDevEnabled = settings.value?.localDevEnabled === true
     const workspaceDir = draft ?? settings.value?.localWorkspaceDir ?? ''
+    const discoveredAggregates = (overview?.aggregateBundles ?? []).filter(item => !OFFICIAL_ATLAS_SET.has(item.packageName))
+    const trackedPackages = [
+      ...Object.values(ATLAS_BUNDLES),
+      ...discoveredAggregates.map(item => item.packageName),
+    ]
+    const settingsByPackage = useAggregateSettingsMap(ctx.slots, trackedPackages)
 
     useEffect(() => {
       if (!canList) return
@@ -293,6 +349,27 @@ export function apply(ctx: ClientContext): void {
       dialog.showModal()
       cancelUninstall.current?.focus()
     }, [uninstallTarget])
+
+    useEffect(() => {
+      if (!Array.isArray(inventory)) return
+      setExpandedSettings(prev => {
+        let changed = false
+        const next: Record<string, boolean> = {}
+        for (const [pkg, open] of Object.entries(prev)) {
+          if (!open) continue
+          const isOfficial = OFFICIAL_ATLAS_SET.has(pkg)
+          const bundleEnabled = isOfficial
+            ? inventory.find(item => item.name === pkg)?.enabled === true
+            : discoveredAggregates.some(item => item.packageName === pkg && item.enabled)
+          if (bundleEnabled && settingsByPackage.has(pkg)) {
+            next[pkg] = true
+          } else {
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    }, [inventory, overview, settingsByPackage])
 
     if (!canList) return <p className="dsh-atlas-manager-status">{t('readDenied')}</p>
     if (inventory === undefined) return <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
@@ -381,7 +458,9 @@ export function apply(ctx: ClientContext): void {
     }
 
     const statusByPackage = new Map((overview?.aggregateBundles ?? []).map(item => [item.packageName, item]))
-    const discoveredAggregates = (overview?.aggregateBundles ?? []).filter(item => !OFFICIAL_ATLAS_SET.has(item.packageName))
+    const toggleSettings = (packageName: string) => {
+      setExpandedSettings(prev => ({ ...prev, [packageName]: !prev[packageName] }))
+    }
 
     return (
       <div data-atlas-manager="">
@@ -455,6 +534,10 @@ export function apply(ctx: ClientContext): void {
               : enabled ? 'enabled' : notInstalled ? 'notInstalled' : 'disabled')
             const statusId = `${listId}-${atlas}`
             const rowError = localDevError?.packageName === packageName ? localDevError : undefined
+            const settingsInfo = enabled ? settingsByPackage.get(packageName) : undefined
+            const canShowSettings = settingsInfo !== undefined && typeof renderFactorySlot === 'function'
+            const settingsOpen = canShowSettings && expandedSettings[packageName] === true
+            const panelId = `${listId}-settings-${atlas}`
             return (
               <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
                 {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
@@ -480,6 +563,15 @@ export function apply(ctx: ClientContext): void {
                     {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
                     {notice && <NoticeLine atlas={atlas} notice={notice} />}
                   </div>
+                  {canShowSettings && (
+                    <SettingsToggleButton
+                      packageName={packageName}
+                      count={settingsInfo.count}
+                      open={settingsOpen}
+                      panelId={panelId}
+                      onToggle={() => toggleSettings(packageName)}
+                    />
+                  )}
                   {localDevEnabled && localStatus && (
                     <LocalDevControls
                       status={localStatus}
@@ -521,6 +613,11 @@ export function apply(ctx: ClientContext): void {
                     <span className="dsh-atlas-manager-thumb" />
                   </button>
                 </div>
+                {settingsOpen && (
+                  <div id={panelId} className="dsh-atlas-settings-panel" data-atlas-settings-panel={packageName}>
+                    {renderDynamicFactorySlot(renderFactorySlot!, settingsInfo.factoryName, { view: 'page' })}
+                  </div>
+                )}
               </li>
             )
           })}
@@ -532,6 +629,10 @@ export function apply(ctx: ClientContext): void {
             <ul className="dsh-atlas-manager-list" data-discovered-aggregates="">
               {discoveredAggregates.map(item => {
                 const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
+                const settingsInfo = item.enabled ? settingsByPackage.get(item.packageName) : undefined
+                const canShowSettings = settingsInfo !== undefined && typeof renderFactorySlot === 'function'
+                const settingsOpen = canShowSettings && expandedSettings[item.packageName] === true
+                const panelId = `${listId}-settings-other-${item.packageName.replace(/[^a-zA-Z0-9_-]/g, '-')}`
                 return (
                   <li key={item.packageName} className="dsh-atlas-manager-row">
                     <span className="dsh-atlas-manager-icon" aria-hidden="true">
@@ -550,6 +651,15 @@ export function apply(ctx: ClientContext): void {
                       <p className="dsh-atlas-manager-status">
                         {t(item.enabled ? 'enabled' : 'disabled')} · {item.members.length}
                       </p>
+                      {canShowSettings && (
+                        <SettingsToggleButton
+                          packageName={item.packageName}
+                          count={settingsInfo.count}
+                          open={settingsOpen}
+                          panelId={panelId}
+                          onToggle={() => toggleSettings(item.packageName)}
+                        />
+                      )}
                       {localDevEnabled && (
                         <LocalDevControls
                           status={item}
@@ -566,6 +676,11 @@ export function apply(ctx: ClientContext): void {
                       )}
                     </div>
                     <div className="dsh-atlas-manager-control" />
+                    {settingsOpen && (
+                      <div id={panelId} className="dsh-atlas-settings-panel" data-atlas-settings-panel={item.packageName}>
+                        {renderDynamicFactorySlot(renderFactorySlot!, settingsInfo.factoryName, { view: 'page' })}
+                      </div>
+                    )}
                   </li>
                 )
               })}

@@ -114,6 +114,40 @@ export const CSS = `
 .dsh-atlas-local-btn:disabled { cursor: default; opacity: 0.55; }
 @media (hover: hover) {
   .dsh-atlas-local-btn:enabled:hover { background: var(--dsw-alias-interactive-bg-hover); }
+  .dsh-atlas-settings-toggle:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
+  }
+}
+.dsh-atlas-settings-toggle-row { margin-top: 6px; }
+.dsh-atlas-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.dsh-atlas-settings-chevron {
+  flex-shrink: 0;
+  transition: transform 140ms ease;
+}
+.dsh-atlas-settings-toggle[aria-expanded='true'] .dsh-atlas-settings-chevron {
+  transform: rotate(90deg);
+}
+.dsh-atlas-settings-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2, color-mix(in srgb, var(--dsw-alias-label-primary) 2.5%, transparent));
 }
 .dsh-atlas-manager-status {
   font-size: 13px;
@@ -212,7 +246,7 @@ export const CSS = `
 .dsh-atlas-manager-switch[aria-disabled='true'] { cursor: default; opacity: 0.55; }
 .dsh-atlas-manager-switch:focus-visible, .dsh-atlas-manager-retry:focus-visible,
 .dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible,
-.dsh-atlas-local-btn:focus-visible {
+.dsh-atlas-local-btn:focus-visible, .dsh-atlas-settings-toggle:focus-visible {
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
   outline-offset: 2px;
 }
@@ -274,5 +308,6 @@ export const CSS = `
 @media (prefers-reduced-motion: reduce) {
   .dsh-atlas-manager-thumb { transition: none; }
   .dsh-atlas-manager-spinner { animation: none; }
+  .dsh-atlas-settings-chevron { transition: none; }
 }
 `

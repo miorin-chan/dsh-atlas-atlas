@@ -14,6 +14,9 @@
 管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、脉络、
 外观的顺序渲染七个开关，并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
 它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
+对已启用且暴露了 `dsh-aggregate.config:<bundleName>` Slot Factory 的聚合包（包含官方七个与自动发现的聚合包），
+管理卡订阅 `plugins.bundle.config` 与成员子槽变更，在对应行内提供默认收起的「设置（N）」折叠按钮，
+点击后通过 `renderFactorySlot` 懒加载并就地渲染该聚合包的完整成员设置。
 
 开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，
 保存实际安装的精确版本；脉络和外观作为本地成员在此模式下仅显示本地安装提示，不尝试请求 npm。
@@ -87,3 +90,13 @@ npm run check
   管理卡整体停用时，详情区四个控制消失。
 - 重载页面后确认状态，并检查英文浅色、英文深色和中文深色界面。
   Chrome 未报告未捕获异常或 Atlas 插槽错误。
+
+## 一次性 profile 实测（行内聚合设置）
+
+2026-11-25，使用 DSH `0.2.2-rc.5` 与 `tools/dsh-web-drive` 在一次性 `web` profile 加载 `dsh-atlas-atlas`、
+`dsh-atlas-list` 与 `dsh-atlas-visual`。
+
+- Visual Atlas 独立详情页通过 `SlotFactory` 正常渲染未登录时激活的 3 项成员设置。
+- 管理卡详情页初始全部收起，List Atlas 行显示 `Settings (2)`、Visual Atlas 行显示 `Settings (3)`。
+- 依次展开 Visual Atlas 与 List Atlas 后，各自的成员设置在行内全宽展示并正常交互，再次点击可独立收起；
+  全程无控制台错误、未捕获异常或日志报错。
