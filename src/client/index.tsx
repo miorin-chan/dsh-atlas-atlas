@@ -611,14 +611,13 @@ export function apply(ctx: ClientContext): void {
         <div className="dsh-atlas-manager-heading-row">
           <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
           {expandablePackages.length > 0 && (
-            <Tooltip label={t(allExpanded ? 'collapseAll' : 'expandAll')} side="top" portal delayMs={200}>
+            <Tooltip label={t(allExpanded ? 'collapseAll' : 'expandAll')} side="right" portal delayMs={300} focusDelayMs={300}>
               <Button
                 variant="ghost"
                 size="sm"
                 className="dsh-atlas-expand-all"
                 data-atlas-expand-all=""
                 aria-label={t(allExpanded ? 'collapseAll' : 'expandAll')}
-                aria-pressed={allExpanded}
                 icon={<ExpandAllIcon expanded={allExpanded} />}
                 onClick={toggleExpandAll}
               />

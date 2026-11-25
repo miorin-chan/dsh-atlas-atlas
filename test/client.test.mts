@@ -52,7 +52,27 @@ const testPrimitivesStub = {
   IconTrashOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
   PluginArtworkSubagent: () => null,
   Switch: SwitchStub,
-  Tooltip: ({ children }: { children: unknown }) => children,
+  Tooltip: ({
+    children,
+    side,
+    delayMs,
+    focusDelayMs,
+    portal,
+    label,
+  }: {
+    children: unknown
+    side?: string
+    delayMs?: number
+    focusDelayMs?: number
+    portal?: boolean
+    label?: string
+  }) => createElement('span', {
+    'data-test-tooltip-side': side,
+    'data-test-tooltip-delay': delayMs,
+    'data-test-tooltip-focus-delay': focusDelayMs,
+    'data-test-tooltip-portal': portal,
+    'data-test-tooltip-label': label,
+  }, children as never),
 }
 const plugin = registration.factory(id => id === '@deepseek-ai/dsh-client-ui-primitives' ? testPrimitivesStub : testRequire(id))
 
@@ -598,11 +618,16 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     // Expand-all icon button above bundles expands every expandable bundle and passes expandCommand.
     const expandAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
     assert.equal(expandAllBtn.props['aria-label'], 'expandAll')
-    assert.equal(expandAllBtn.props['aria-pressed'], false)
+    assert.equal(expandAllBtn.props['aria-pressed'], undefined)
+    const expandAllTooltip = view!.root.findByProps({ 'data-test-tooltip-label': 'expandAll' })
+    assert.equal(expandAllTooltip.props['data-test-tooltip-side'], 'right')
+    assert.equal(expandAllTooltip.props['data-test-tooltip-delay'], 300)
+    assert.equal(expandAllTooltip.props['data-test-tooltip-focus-delay'], 300)
+    assert.equal(expandAllTooltip.props['data-test-tooltip-portal'], true)
     await act(async () => { expandAllBtn.props.onClick() })
     const collapseAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
     assert.equal(collapseAllBtn.props['aria-label'], 'collapseAll')
-    assert.equal(collapseAllBtn.props['aria-pressed'], true)
+    assert.equal(collapseAllBtn.props['aria-pressed'], undefined)
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }))
@@ -610,7 +635,7 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     await act(async () => { view!.root.findByProps({ 'data-atlas-expand-all': '' }).props.onClick() })
     const resetExpandBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
     assert.equal(resetExpandBtn.props['aria-label'], 'expandAll')
-    assert.equal(resetExpandBtn.props['aria-pressed'], false)
+    assert.equal(resetExpandBtn.props['aria-pressed'], undefined)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }).length, 0)

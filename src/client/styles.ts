@@ -67,13 +67,17 @@ export const CSS = `
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
 }
 @media (hover: hover) {
-  .dsh-atlas-expand-all:hover,
-  .dsh-atlas-expand-all[aria-pressed='true'] {
+  .dsh-atlas-expand-all:hover {
     color: var(--dsw-alias-label-primary);
     background: var(--dsw-alias-interactive-bg-hover);
   }
+}
+.dsh-atlas-expand-all:active {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-active);
 }
 .dsh-atlas-manager-subheading {
   margin: 18px 0 6px;
@@ -399,6 +403,7 @@ export const CSS = `
   color: var(--dsw-alias-label-secondary);
 }
 @media (prefers-reduced-motion: reduce) {
+  .dsh-atlas-expand-all,
   .dsh-atlas-manager-icon,
   .dsh-atlas-manager-copy,
   .dsh-atlas-detail-open { transition: none; }
