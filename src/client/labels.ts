@@ -89,6 +89,7 @@ const en = {
   'localDevError_rollback-failed': 'Source switch and automatic rollback both failed.',
   bundleSettings: 'Settings ({count})',
   bundleSettingsPlain: 'Settings',
+  openBundleDetails: 'Open {name} details',
 }
 
 export type AtlasLabelKey = keyof typeof en
@@ -188,6 +189,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': '切换失败且自动回滚失败。',
     bundleSettings: '设置（{count}）',
     bundleSettingsPlain: '设置',
+    openBundleDetails: '打开{name}详情页',
   },
   ja: {
     uninstall: 'アンインストール',
@@ -278,6 +280,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': '切り替えとロールバックの両方に失敗しました。',
     bundleSettings: '設定 ({count})',
     bundleSettingsPlain: '設定',
+    openBundleDetails: '{name}の詳細を開く',
   },
   de: {
     uninstall: 'Deinstallieren',
@@ -368,6 +371,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': 'Wechsel und automatischer Rollback fehlgeschlagen.',
     bundleSettings: 'Einstellungen ({count})',
     bundleSettingsPlain: 'Einstellungen',
+    openBundleDetails: 'Details zu {name} öffnen',
   },
   es: {
     uninstall: 'Desinstalar',
@@ -458,6 +462,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': 'Falló el cambio y también la reversión.',
     bundleSettings: 'Configuración ({count})',
     bundleSettingsPlain: 'Configuración',
+    openBundleDetails: 'Abrir detalles de {name}',
   },
   fr: {
     uninstall: 'Désinstaller',
@@ -548,6 +553,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': 'Échec du changement et du retour arrière.',
     bundleSettings: 'Paramètres ({count})',
     bundleSettingsPlain: 'Paramètres',
+    openBundleDetails: 'Ouvrir les détails de {name}',
   },
   pt: {
     uninstall: 'Desinstalar',
@@ -638,6 +644,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': 'Falha na troca e na reversão automática.',
     bundleSettings: 'Configurações ({count})',
     bundleSettingsPlain: 'Configurações',
+    openBundleDetails: 'Abrir detalhes de {name}',
   },
   ru: {
     uninstall: 'Удалить',
@@ -728,5 +735,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     'localDevError_rollback-failed': 'Не удалось переключить источник и выполнить откат.',
     bundleSettings: 'Настройки ({count})',
     bundleSettingsPlain: 'Настройки',
+    openBundleDetails: 'Открыть страницу {name}',
   },
 }

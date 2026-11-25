@@ -50,7 +50,7 @@ const ATLASES = Object.keys(ATLAS_BUNDLES) as Atlas[]
 const OFFICIAL_ATLAS_SET = new Set<string>(Object.values(ATLAS_BUNDLES))
 export const inject = ['locale', 'slots', 'remote', 'remote.pluginManager', 'configForms']
 
-type ClientContext = Pick<Context, 'effect' | 'on'> & {
+type ClientContext = Pick<Context, 'effect' | 'on'> & Partial<Pick<Context, 'get'>> & {
   locale: LocaleRuntime
   slots: SlotRegistry
   remote: ClientRemote
@@ -165,6 +165,7 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
   const subscribeLocale = (listener: () => void) => ctx.locale.subscribe(listener)
   const localeSnapshot = () => ctx.locale.getSnapshot()
+  const getPluginNavigation = () => (typeof ctx.get === 'function' ? ctx.get('pluginNavigation') : undefined)
 
   function NoticeLine({ atlas, notice }: { atlas: Atlas; notice: Notice }) {
     const { kind } = notice
@@ -244,6 +245,75 @@ export function apply(ctx: ClientContext): void {
           </>
         )}
       </div>
+    )
+  }
+
+  function BundleRowIcon({
+    packageName,
+    src,
+    size,
+    canOpen,
+    onOpen,
+  }: {
+    packageName: string
+    src: string
+    size: number
+    canOpen: boolean
+    onOpen: (packageName: string) => void
+  }) {
+    const img = <img src={src} width={size} height={size} alt="" />
+    if (!canOpen) {
+      return <span className="dsh-atlas-manager-icon" aria-hidden="true">{img}</span>
+    }
+    return (
+      <button
+        type="button"
+        className="dsh-atlas-manager-icon dsh-atlas-manager-icon-btn"
+        tabIndex={-1}
+        aria-hidden="true"
+        onClick={() => onOpen(packageName)}
+      >
+        {img}
+      </button>
+    )
+  }
+
+  function BundleRowTitle({
+    packageName,
+    displayName,
+    canOpen,
+    onOpen,
+  }: {
+    packageName: string
+    displayName: string
+    canOpen: boolean
+    onOpen: (packageName: string) => void
+  }) {
+    if (!canOpen) return <span>{displayName}</span>
+    return (
+      <button
+        type="button"
+        className="dsh-atlas-manager-link"
+        data-atlas-open={packageName}
+        title={t('openBundleDetails', { name: displayName })}
+        onClick={() => onOpen(packageName)}
+      >
+        <span>{displayName}</span>
+        <svg
+          className="dsh-atlas-manager-link-arrow"
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4.5 2.5 8 6l-3.5 3.5" />
+        </svg>
+      </button>
     )
   }
 
@@ -458,6 +528,8 @@ export function apply(ctx: ClientContext): void {
     }
 
     const statusByPackage = new Map((overview?.aggregateBundles ?? []).map(item => [item.packageName, item]))
+    const canNavigate = typeof getPluginNavigation()?.openBundle === 'function'
+    const openBundle = (packageName: string) => { getPluginNavigation()?.openBundle(packageName) }
     const toggleSettings = (packageName: string) => {
       setExpandedSettings(prev => ({ ...prev, [packageName]: !prev[packageName] }))
     }
@@ -534,6 +606,7 @@ export function apply(ctx: ClientContext): void {
               : enabled ? 'enabled' : notInstalled ? 'notInstalled' : 'disabled')
             const statusId = `${listId}-${atlas}`
             const rowError = localDevError?.packageName === packageName ? localDevError : undefined
+            const canOpenBundle = !notInstalled && canNavigate
             const settingsInfo = enabled ? settingsByPackage.get(packageName) : undefined
             const canShowSettings = settingsInfo !== undefined && typeof renderFactorySlot === 'function'
             const settingsOpen = canShowSettings && expandedSettings[packageName] === true
@@ -541,12 +614,21 @@ export function apply(ctx: ClientContext): void {
             return (
               <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
                 {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
-                <span className="dsh-atlas-manager-icon" aria-hidden="true">
-                  <img src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]} width={30} height={30} alt="" />
-                </span>
+                <BundleRowIcon
+                  packageName={packageName}
+                  src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]}
+                  size={30}
+                  canOpen={canOpenBundle}
+                  onOpen={openBundle}
+                />
                 <div className="dsh-atlas-manager-copy">
                   <div className="dsh-atlas-manager-label">
-                    <span>{t(atlas)}</span>
+                    <BundleRowTitle
+                      packageName={packageName}
+                      displayName={t(atlas)}
+                      canOpen={canOpenBundle}
+                      onOpen={openBundle}
+                    />
                     {localDevEnabled && localStatus && (localStatus.selfMode === 'local' || localStatus.membersMode === 'local') && (
                       <span className="dsh-atlas-manager-tags">
                         {localStatus.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
@@ -629,18 +711,28 @@ export function apply(ctx: ClientContext): void {
             <ul className="dsh-atlas-manager-list" data-discovered-aggregates="">
               {discoveredAggregates.map(item => {
                 const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
+                const canOpenBundle = item.installed && canNavigate
                 const settingsInfo = item.enabled ? settingsByPackage.get(item.packageName) : undefined
                 const canShowSettings = settingsInfo !== undefined && typeof renderFactorySlot === 'function'
                 const settingsOpen = canShowSettings && expandedSettings[item.packageName] === true
                 const panelId = `${listId}-settings-other-${item.packageName.replace(/[^a-zA-Z0-9_-]/g, '-')}`
                 return (
                   <li key={item.packageName} className="dsh-atlas-manager-row">
-                    <span className="dsh-atlas-manager-icon" aria-hidden="true">
-                      <img src={ATLAS_ICONS.plugin} width={24} height={24} alt="" />
-                    </span>
+                    <BundleRowIcon
+                      packageName={item.packageName}
+                      src={ATLAS_ICONS.plugin}
+                      size={24}
+                      canOpen={canOpenBundle}
+                      onOpen={openBundle}
+                    />
                     <div className="dsh-atlas-manager-copy">
                       <div className="dsh-atlas-manager-label">
-                        <span>{item.packageName}</span>
+                        <BundleRowTitle
+                          packageName={item.packageName}
+                          displayName={item.packageName}
+                          canOpen={canOpenBundle}
+                          onOpen={openBundle}
+                        />
                         {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
                           <span className="dsh-atlas-manager-tags">
                             {item.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}

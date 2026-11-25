@@ -17,6 +17,8 @@
 对已启用且暴露了 `dsh-aggregate.config:<bundleName>` Slot Factory 的聚合包（包含官方七个与自动发现的聚合包），
 管理卡订阅 `plugins.bundle.config` 与成员子槽变更，在对应行内提供默认收起的「设置（N）」折叠按钮，
 点击后通过 `renderFactorySlot` 懒加载并就地渲染该聚合包的完整成员设置。
+对于已安装的官方或自动发现的聚合包，
+点击行内的图标或标题会调用 `ctx.pluginNavigation.openBundle` 直接跳转到该聚合包的详情页（未安装包保持静态展示）。
 
 开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，优先请求 npm 公共 registry，
 保存实际安装的精确版本；脉络和外观作为本地成员在此模式下仅显示本地安装提示，不尝试请求 npm。
@@ -100,3 +102,5 @@ npm run check
 - 管理卡详情页初始全部收起，List Atlas 行显示 `Settings (2)`、Visual Atlas 行显示 `Settings (3)`。
 - 依次展开 Visual Atlas 与 List Atlas 后，各自的成员设置在行内全宽展示并正常交互，再次点击可独立收起；
   全程无控制台错误、未捕获异常或日志报错。
+- 点击管理卡内已安装的 Visual Atlas 标题后，页面直接跳转到 `@miorin/dsh-atlas-visual` 详情页并正常显示其聚合设置，
+  未安装的 Workspace Atlas 不显示跳转按钮。

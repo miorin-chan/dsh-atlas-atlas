@@ -703,3 +703,127 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     await ctx.fiber.dispose()
   }
 })
+
+test('navigates to bundle detail pages for installed official and discovered aggregates', async () => {
+  const effects: Array<() => void> = []
+  const openedBundles: string[] = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => ({
+    async json() {
+      return {
+        ok: true,
+        value: {
+          enabled: false,
+          workspaceDir: '',
+          workspaceDirValid: false,
+          aggregateBundles: [
+            {
+              packageName: '@local/custom-bundle',
+              installed: true,
+              enabled: false,
+              official: false,
+              isAggregate: true,
+              manageable: true,
+              selfMode: 'baseline',
+              membersMode: 'bundled',
+              canRestoreSelf: false,
+              canSwitchSelfToLocal: false,
+              canSwitchMembersToLocal: false,
+              canRestoreMembers: false,
+              localCheckoutAvailable: false,
+              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false, activeLocal: false }],
+              membersReady: false,
+              drifted: false,
+            },
+          ],
+        },
+      }
+    },
+  }) as unknown as Response
+
+  const form = {
+    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
+    getSnapshot() { return this.snapshot },
+    subscribe: () => () => {},
+    async mutate() { return true },
+  }
+
+  let hasNavigation = true
+  const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
+  plugin.apply({
+    effect(install) { effects.push(install()) },
+    on: () => () => {},
+    get(service: string) {
+      if (service === 'pluginNavigation' && hasNavigation) {
+        return {
+          openBundle(packageName: string) { openedBundles.push(packageName) },
+          openList() {},
+        }
+      }
+      return undefined
+    },
+    remote: {
+      pluginManager: {
+        async listBundles() {
+          return {
+            ok: true,
+            value: [
+              { name: '@miorin/dsh-atlas-visual', installed: true, availability: 'profile', enabled: true, removable: true, rows: [] },
+              { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', enabled: false, removable: true, rows: [] },
+            ],
+          }
+        },
+      },
+      $on: () => () => {},
+    },
+    configForms: { get: () => form },
+    locale: { bind: () => (key: string) => key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
+    slots: {
+      inject: (_: string, register: () => () => void) => register(),
+      register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
+        slots.set(options.name, render)
+        return () => {}
+      },
+    },
+  })
+
+  const Panel = slots.get('plugins.bundle.config')!
+  let view: ReturnType<typeof create> | undefined
+  try {
+    await act(async () => {
+      view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
+    })
+
+    // Installed official Atlases (both enabled and disabled) and installed discovered aggregates are clickable.
+    const visualTitle = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' })
+    const listTitle = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-list' })
+    const customTitle = view!.root.findByProps({ 'data-atlas-open': '@local/custom-bundle' })
+    assert.equal(view!.root.findAllByProps({ 'data-atlas-open': '@miorin/dsh-atlas-workspace' }).length, 0)
+
+    const iconButtons = view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' })
+    assert.equal(iconButtons.length, 3)
+
+    visualTitle.props.onClick()
+    listTitle.props.onClick()
+    customTitle.props.onClick()
+    iconButtons[0].props.onClick()
+    assert.deepEqual(openedBundles, [
+      '@miorin/dsh-atlas-visual',
+      '@miorin/dsh-atlas-list',
+      '@local/custom-bundle',
+      '@miorin/dsh-atlas-list',
+    ])
+
+    // When pluginNavigation is absent, rows render as static spans without links.
+    hasNavigation = false
+    await act(async () => {
+      view!.update(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
+    })
+    assert.equal(view!.root.findAll(node => typeof node.props['data-atlas-open'] === 'string').length, 0)
+    assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (view !== undefined) act(() => view.unmount())
+    for (const dispose of effects.reverse()) dispose()
+  }
+})
