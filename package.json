@@ -1,6 +1,6 @@
 {
   "name": "@miorin/dsh-atlas-atlas",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "MIT",
   "description": "Install and manage Modular Improvement Plan bundles, including local repository links.",
   "type": "module",
@@ -95,5 +95,13 @@
     "react": "18.3.1",
     "react-test-renderer": "18.3.1",
     "typescript": "5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/miorin-chan/dsh-atlas-atlas.git"
+  },
+  "homepage": "https://github.com/miorin-chan/dsh-atlas-atlas#readme",
+  "bugs": {
+    "url": "https://github.com/miorin-chan/dsh-atlas-atlas/issues"
   }
 }

@@ -27,8 +27,6 @@ import {
   ATLAS_BUNDLES,
   canUninstallAtlas,
   ENTRY_ID,
-  isLocalOnlyAtlas,
-  localAtlasDir,
   normalizeWorkspaceDir,
   PACKAGE,
   setAtlasEnabled,
@@ -45,7 +43,6 @@ import type {
   LocalDevRequest,
 } from '../lib/local-dev-types.js'
 import { LABELS, localDevErrorKey, type AtlasLabelKey } from './labels.js'
-import { LOCAL_ICONS } from './local-icons.js'
 import { fetchLocalDevOverview, requestLocalDev } from './local-dev-api.js'
 import { LocalDevBadge, LocalDevDetailSection } from './local-dev-detail.js'
 import { ATLAS_ICONS } from './published-icons.js'
@@ -176,15 +173,13 @@ export function apply(ctx: ClientContext): void {
   const localeSnapshot = () => ctx.locale.getSnapshot()
   const getPluginNavigation = () => (typeof ctx.get === 'function' ? ctx.get('pluginNavigation') : undefined)
 
-  function NoticeLine({ atlas, notice }: { atlas: Atlas; notice: Notice }) {
+  function NoticeLine({ notice }: { notice: Notice }) {
     const { kind } = notice
     const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'localWorkspaceRequired'
       || kind === 'conflict' || kind === 'continuityConflict' || kind === 'uninstallUnavailable'
     const message = notice.kind === 'conflict'
       ? t('conflict', { bundle: notice.bundle, row: notice.row })
-      : notice.kind === 'localInstallRequired'
-        ? t('localInstallRequired', { dir: localAtlasDir(atlas) })
-        : t(kind)
+      : t(kind)
     return <p className="dsh-atlas-manager-status" data-atlas-status={kind} data-error={error ? '' : undefined}>{message}</p>
   }
 
@@ -392,7 +387,7 @@ export function apply(ctx: ClientContext): void {
             if (notice?.kind !== 'uninstallFailed' && notice?.kind !== 'uninstallUnavailable') return null
             return <div key={atlas}>
               <div className="dsh-atlas-manager-label">{t(atlas)}</div>
-              <NoticeLine atlas={atlas} notice={notice} />
+              <NoticeLine notice={notice} />
               {'detail' in notice && notice.detail && <code className="dsh-atlas-manager-status">{notice.detail}</code>}
             </div>
           })}
@@ -631,7 +626,6 @@ export function apply(ctx: ClientContext): void {
             const localStatus = statusByPackage.get(packageName)
             const enabled = bundle?.enabled ?? false
             const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
-            const localInstallRequired = notInstalled && !localDevEnabled && isLocalOnlyAtlas(atlas)
             const localWorkspaceRequired = notInstalled && localDevEnabled && savedWorkspaceDir === undefined
             const denied = !canToggle || bundle?.readOnlyReason !== undefined
               || (!enabled && notInstalled && (!canInstall || (localDevEnabled && !canInspect)))
@@ -663,7 +657,7 @@ export function apply(ctx: ClientContext): void {
                 <div className="dsh-atlas-manager-row-main">
                   {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
                   <BundleRowIcon
-                    src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]}
+                    src={ATLAS_ICONS[atlas]}
                     size={24}
                     onPress={onIconPress}
                   />
@@ -694,9 +688,8 @@ export function apply(ctx: ClientContext): void {
                         {t(status)}
                       </p>
                       {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-                      {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired', { dir: localAtlasDir(atlas) })}</p>}
                       {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
-                      {notice && <NoticeLine atlas={atlas} notice={notice} />}
+                      {notice && <NoticeLine notice={notice} />}
                     </div>
                     {localDevEnabled && localStatus && (
                       <LocalDevControls
@@ -736,9 +729,9 @@ export function apply(ctx: ClientContext): void {
                     <Switch
                       checked={enabled}
                       label={t(atlas)}
-                      disabled={busy || denied || localInstallRequired || localWorkspaceRequired}
+                      disabled={busy || denied || localWorkspaceRequired}
                       onChange={next => {
-                        if (!busy && !denied && !localInstallRequired && !localWorkspaceRequired) {
+                        if (!busy && !denied && !localWorkspaceRequired) {
                           void toggle(atlas, next)
                         }
                       }}

@@ -12,12 +12,6 @@ export const ATLAS_BUNDLES = {
 } as const
 
 export type Atlas = keyof typeof ATLAS_BUNDLES
-export const LOCAL_ONLY_ATLASES = ['continuity', 'visual'] as const satisfies readonly Atlas[]
-export type LocalAtlas = typeof LOCAL_ONLY_ATLASES[number]
-
-export function isLocalOnlyAtlas(atlas: Atlas): atlas is LocalAtlas {
-  return LOCAL_ONLY_ATLASES.some(local => local === atlas)
-}
 
 export type Manager = Pick<ClientRemote['pluginManager'], 'listBundles' | 'installBundle' | 'setBundleEnabled' | 'inspect' | 'removeBundle'>
 export const ENTRY_ID = 'dsh-atlas-atlas'
@@ -29,7 +23,7 @@ export interface LocalInstallOptions {
 export type Progress = 'installing' | 'enabling' | 'disabling' | 'uninstalling'
 export type Failure = 'installFailed' | 'localLinkFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
 export type Notice =
-  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'localInstallRequired' | 'localWorkspaceRequired' | 'uninstallUnavailable' }
+  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'localWorkspaceRequired' | 'uninstallUnavailable' }
   | { kind: Failure; detail?: string }
   | { kind: 'conflict'; bundle: string; row: string }
   | { kind: 'continuityConflict' }
@@ -163,7 +157,6 @@ export async function setAtlasEnabled(
         }
         if (bundle.enabled) return restart
       } else {
-        if (isLocalOnlyAtlas(atlas)) return { kind: 'localInstallRequired' }
         progress('installing')
         failure = 'installFailed'
         const result = resultValue(await manager.installBundle(name, {

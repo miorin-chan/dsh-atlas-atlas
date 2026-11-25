@@ -266,9 +266,9 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
     const switches = bundlesList.findAllByProps({ role: 'switch' })
     assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity', 'visual'])
     const continuitySwitch = switches.find(item => item.props['aria-label'] === 'continuity')
-    assert.equal(continuitySwitch?.props.disabled, true)
+    assert.equal(continuitySwitch?.props.disabled, false)
     const visualSwitch = switches.find(item => item.props['aria-label'] === 'visual')
-    assert.equal(visualSwitch?.props.disabled, true)
+    assert.equal(visualSwitch?.props.disabled, false)
     assert.equal(view.root.findAllByProps({ 'data-discovered-aggregates': '' }).length, 1)
 
     // When localDevEnabled is false, detail contributions render null with zero detail requests.

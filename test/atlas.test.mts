@@ -4,7 +4,6 @@ import {
   ATLAS_BUNDLES,
   PACKAGE,
   canUninstallAtlas,
-  isLocalOnlyAtlas,
   localAtlasSpec,
   normalizeWorkspaceDir,
   setAtlasEnabled,
@@ -63,7 +62,7 @@ test('installs and enables each missing Atlas from the npm registry and reuses i
   assert.deepEqual(Object.keys(ATLAS_BUNDLES), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity', 'visual'])
   assert.equal(ATLAS_BUNDLES.list, '@miorin/dsh-atlas-list')
   const { manager, profile, writes } = fixture()
-  const registryAtlases = Object.entries(ATLAS_BUNDLES).filter(([atlas]) => !isLocalOnlyAtlas(atlas))
+  const registryAtlases = Object.entries(ATLAS_BUNDLES)
   for (const [atlas, name] of registryAtlases) {
     const stages = []
     assert.equal(await setAtlasEnabled(manager, atlas, true, stage => stages.push(stage)), undefined)
@@ -82,15 +81,13 @@ test('installs and enables each missing Atlas from the npm registry and reuses i
   assert.ok(registryAtlases.every(([, name]) => profile.get(name).enabled))
 })
 
-test('requires a local copy of Continuity and Visual but can toggle an existing link without changing sources', async () => {
+test('toggles existing locally linked Continuity and Visual without changing sources', async () => {
   for (const [atlas, name, dir] of [
     ['continuity', '@miorin/dsh-atlas-continuity', 'dsh-atlas-continuity'],
     ['visual', '@miorin/dsh-atlas-visual', 'dsh-atlas-visual'],
   ] as const) {
     const { manager, profile, writes } = fixture()
     assert.equal(ATLAS_BUNDLES[atlas], name)
-    assert.deepEqual(await setAtlasEnabled(manager, atlas, true, ignoreProgress), { kind: 'localInstallRequired' })
-    assert.deepEqual(writes, [])
     const existing = newBundle(name, { source: `link:/atlas/${dir}` })
     profile.set(name, existing)
     assert.equal(await setAtlasEnabled(manager, atlas, true, ignoreProgress), undefined)
