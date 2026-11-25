@@ -6,6 +6,7 @@ import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PluginConfigViewProps, PluginDetailProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import { SegmentedTabs } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
@@ -13,6 +14,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import {
   renderDynamicFactorySlot,
   useAggregateSettingsMap,
+  type AggregateSettingsAvailability,
 } from './aggregate-settings.js'
 import {
   ATLAS_BUNDLES,
@@ -252,23 +254,26 @@ export function apply(ctx: ClientContext): void {
     packageName,
     src,
     size,
+    className,
     canOpen,
     onOpen,
   }: {
     packageName: string
     src: string
     size: number
+    className?: string
     canOpen: boolean
     onOpen: (packageName: string) => void
   }) {
     const img = <img src={src} width={size} height={size} alt="" />
+    const iconClass = className ? `dsh-atlas-manager-icon ${className}` : 'dsh-atlas-manager-icon'
     if (!canOpen) {
-      return <span className="dsh-atlas-manager-icon" aria-hidden="true">{img}</span>
+      return <span className={iconClass} aria-hidden="true">{img}</span>
     }
     return (
       <button
         type="button"
-        className="dsh-atlas-manager-icon dsh-atlas-manager-icon-btn"
+        className={`${iconClass} dsh-atlas-manager-icon-btn`}
         tabIndex={-1}
         aria-hidden="true"
         onClick={() => onOpen(packageName)}
@@ -317,49 +322,6 @@ export function apply(ctx: ClientContext): void {
     )
   }
 
-  function SettingsToggleButton({
-    packageName,
-    count,
-    open,
-    panelId,
-    onToggle,
-  }: {
-    packageName: string
-    count: number | undefined
-    open: boolean
-    panelId: string
-    onToggle: () => void
-  }) {
-    return (
-      <div className="dsh-atlas-settings-toggle-row">
-        <button
-          type="button"
-          className="dsh-atlas-settings-toggle"
-          data-atlas-settings-toggle={packageName}
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={onToggle}
-        >
-          <svg
-            className="dsh-atlas-settings-chevron"
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4.5 2.5 8 6l-3.5 3.5" />
-          </svg>
-          <span>{count !== undefined ? t('bundleSettings', { count }) : t('bundleSettingsPlain')}</span>
-        </button>
-      </div>
-    )
-  }
-
   function AtlasPanel({ useRemoteAccess, renderFactorySlot }: PanelProps) {
     const canList = useRemoteAccess('pluginManager/listBundles')
     const canToggle = useRemoteAccess('pluginManager/setBundleEnabled')
@@ -377,7 +339,7 @@ export function apply(ctx: ClientContext): void {
     const [overview, setOverview] = useState<LocalDevOverview>()
     const [localDevBusy, setLocalDevBusy] = useState(false)
     const [localDevError, setLocalDevError] = useState<{ packageName: string; code: LocalDevErrorCode; detail?: string }>()
-    const [expandedSettings, setExpandedSettings] = useState<Readonly<Record<string, boolean>>>({})
+    const [activeTab, setActiveTab] = useState<'bundles' | 'settings'>('bundles')
     const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
     useSyncExternalStore(subscribeLocale, localeSnapshot)
     const listId = useId()
@@ -390,6 +352,42 @@ export function apply(ctx: ClientContext): void {
       ...discoveredAggregates.map(item => item.packageName),
     ]
     const settingsByPackage = useAggregateSettingsMap(ctx.slots, trackedPackages)
+    const canNavigate = typeof getPluginNavigation()?.openBundle === 'function'
+    const configurableBundles: Array<{
+      readonly packageName: string
+      readonly displayName: string
+      readonly iconSrc: string
+      readonly canOpen: boolean
+      readonly settings: AggregateSettingsAvailability
+    }> = []
+    if (Array.isArray(inventory) && typeof renderFactorySlot === 'function') {
+      for (const atlas of ATLASES) {
+        const packageName = ATLAS_BUNDLES[atlas]
+        const bundle = inventory.find(item => item.name === packageName)
+        if (bundle?.enabled !== true) continue
+        const found = settingsByPackage.get(packageName)
+        if (found === undefined) continue
+        configurableBundles.push({
+          packageName,
+          displayName: t(atlas),
+          iconSrc: isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas],
+          canOpen: canNavigate,
+          settings: found,
+        })
+      }
+      for (const item of discoveredAggregates) {
+        if (!item.enabled) continue
+        const found = settingsByPackage.get(item.packageName)
+        if (found === undefined) continue
+        configurableBundles.push({
+          packageName: item.packageName,
+          displayName: item.packageName,
+          iconSrc: ATLAS_ICONS.plugin,
+          canOpen: item.installed && canNavigate,
+          settings: found,
+        })
+      }
+    }
 
     useEffect(() => {
       if (!canList) return
@@ -421,25 +419,10 @@ export function apply(ctx: ClientContext): void {
     }, [uninstallTarget])
 
     useEffect(() => {
-      if (!Array.isArray(inventory)) return
-      setExpandedSettings(prev => {
-        let changed = false
-        const next: Record<string, boolean> = {}
-        for (const [pkg, open] of Object.entries(prev)) {
-          if (!open) continue
-          const isOfficial = OFFICIAL_ATLAS_SET.has(pkg)
-          const bundleEnabled = isOfficial
-            ? inventory.find(item => item.name === pkg)?.enabled === true
-            : discoveredAggregates.some(item => item.packageName === pkg && item.enabled)
-          if (bundleEnabled && settingsByPackage.has(pkg)) {
-            next[pkg] = true
-          } else {
-            changed = true
-          }
-        }
-        return changed ? next : prev
-      })
-    }, [inventory, overview, settingsByPackage])
+      if (Array.isArray(inventory) && configurableBundles.length === 0) {
+        setActiveTab('bundles')
+      }
+    }, [inventory, configurableBundles.length])
 
     if (!canList) return <p className="dsh-atlas-manager-status">{t('readDenied')}</p>
     if (inventory === undefined) return <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
@@ -528,233 +511,154 @@ export function apply(ctx: ClientContext): void {
     }
 
     const statusByPackage = new Map((overview?.aggregateBundles ?? []).map(item => [item.packageName, item]))
-    const canNavigate = typeof getPluginNavigation()?.openBundle === 'function'
     const openBundle = (packageName: string) => { getPluginNavigation()?.openBundle(packageName) }
-    const toggleSettings = (packageName: string) => {
-      setExpandedSettings(prev => ({ ...prev, [packageName]: !prev[packageName] }))
-    }
+    const hasSettingsTab = configurableBundles.length > 0
+    const effectiveTab = hasSettingsTab ? activeTab : 'bundles'
+    const allCounted = configurableBundles.every(entry => typeof entry.settings.count === 'number')
+    const totalSettingsCount = allCounted
+      ? configurableBundles.reduce((sum, entry) => sum + (entry.settings.count ?? 0), 0)
+      : undefined
+    const settingsTabLabel = totalSettingsCount !== undefined
+      ? t('bundleSettings', { count: totalSettingsCount })
+      : t('bundleSettingsPlain')
+    const bundlesTabId = `${listId}-tab-bundles`
+    const settingsTabId = `${listId}-tab-settings`
+    const bundlesPanelId = `${listId}-panel-bundles`
+    const settingsPanelId = `${listId}-panel-settings`
 
     return (
       <div data-atlas-manager="">
-        <section className="dsh-atlas-manager-repositories" aria-busy={saving || localDevBusy}>
-          <div className="dsh-atlas-manager-repository-row">
-            <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('localDevToggle')}</span>
-            <button type="button" role="switch" className="dsh-atlas-manager-switch"
-              aria-labelledby={`${pathId}-mode`} aria-checked={localDevEnabled}
-              aria-disabled={!canEdit || busy}
-              aria-describedby={`${pathId}-mode-help`}
-              disabled={!canEdit || busy}
-              onClick={() => { void toggleLocalDev(!localDevEnabled) }}>
-              <span className="dsh-atlas-manager-thumb" />
-            </button>
+        {hasSettingsTab && (
+          <div className="dsh-atlas-tabs-bar" data-atlas-tabs="">
+            <SegmentedTabs
+              size="sm"
+              className="dsh-atlas-tabs"
+              label={t('tabsLabel')}
+              value={effectiveTab}
+              onChange={setActiveTab}
+              items={[
+                { value: 'bundles', label: t('tabBundles'), id: bundlesTabId, panelId: bundlesPanelId },
+                { value: 'settings', label: settingsTabLabel, id: settingsTabId, panelId: settingsPanelId },
+              ]}
+            />
           </div>
-          <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localDevHelp')}</p>
-          {localDevEnabled && (
-            <div className="dsh-atlas-manager-path">
-              <label htmlFor={pathId}>{t('localWorkspaceDir')}</label>
-              <div className="dsh-atlas-manager-path-controls">
-                <input
-                  type="text"
-                  id={pathId}
-                  value={workspaceDir}
-                  placeholder="/path/to/plugins"
-                  spellCheck={false}
-                  autoComplete="off"
-                  aria-describedby={`${pathId}-help`}
-                  aria-invalid={!pathValid}
+        )}
+
+        {effectiveTab === 'bundles' && (
+          <div
+            role="tabpanel"
+            id={bundlesPanelId}
+            aria-labelledby={hasSettingsTab ? bundlesTabId : undefined}
+            data-atlas-panel="bundles"
+          >
+            <section className="dsh-atlas-manager-repositories" aria-busy={saving || localDevBusy}>
+              <div className="dsh-atlas-manager-repository-row">
+                <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('localDevToggle')}</span>
+                <button type="button" role="switch" className="dsh-atlas-manager-switch"
+                  aria-labelledby={`${pathId}-mode`} aria-checked={localDevEnabled}
+                  aria-disabled={!canEdit || busy}
+                  aria-describedby={`${pathId}-mode-help`}
                   disabled={!canEdit || busy}
-                  onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
-                  onKeyDown={event => { if (event.key === 'Enter') void saveWorkspaceDir() }}
-                />
-                <button
-                  type="button"
-                  className="dsh-atlas-manager-retry"
-                  disabled={!canEdit || busy || !pathValid || !pathDirty}
-                  onClick={() => { void saveWorkspaceDir() }}
-                >
-                  {t('saveWorkspaceDir')}
+                  onClick={() => { void toggleLocalDev(!localDevEnabled) }}>
+                  <span className="dsh-atlas-manager-thumb" />
                 </button>
               </div>
-              <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={!pathValid || overview?.workspaceDirIssue ? '' : undefined}>
-                {!pathValid
-                  ? t('invalidWorkspaceDir')
-                  : overview?.workspaceDirIssue ?? t('localWorkspaceDirHelp')}
-              </p>
-            </div>
-          )}
-          {settings.status !== 'loading' && !canEdit && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-          {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('localDevApplyFailed')}</p>}
-        </section>
-
-        <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
-        <ul className="dsh-atlas-manager-list" aria-labelledby={listId}>
-          {ATLASES.map(atlas => {
-            const packageName = ATLAS_BUNDLES[atlas]
-            const bundle = inventory.find(item => item.name === packageName)
-            const localStatus = statusByPackage.get(packageName)
-            const enabled = bundle?.enabled ?? false
-            const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
-            const localInstallRequired = notInstalled && !localDevEnabled && isLocalOnlyAtlas(atlas)
-            const localWorkspaceRequired = notInstalled && localDevEnabled && savedWorkspaceDir === undefined
-            const denied = !canToggle || bundle?.readOnlyReason !== undefined
-              || (!enabled && notInstalled && (!canInstall || (localDevEnabled && !canInspect)))
-            const showUninstall = canRemove && canUninstallAtlas(bundle)
-            const stage = activity?.atlas === atlas ? activity.stage : undefined
-            const notice = stage === undefined ? notices[atlas]?.notice : undefined
-            const detail = stage === undefined ? notice && 'detail' in notice ? notice.detail : bundle?.error?.diagnostic : undefined
-            const status = stage ?? (bundle?.error !== undefined ? 'bundleError'
-              : enabled ? 'enabled' : notInstalled ? 'notInstalled' : 'disabled')
-            const statusId = `${listId}-${atlas}`
-            const rowError = localDevError?.packageName === packageName ? localDevError : undefined
-            const canOpenBundle = !notInstalled && canNavigate
-            const settingsInfo = enabled ? settingsByPackage.get(packageName) : undefined
-            const canShowSettings = settingsInfo !== undefined && typeof renderFactorySlot === 'function'
-            const settingsOpen = canShowSettings && expandedSettings[packageName] === true
-            const panelId = `${listId}-settings-${atlas}`
-            return (
-              <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
-                {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
-                <BundleRowIcon
-                  packageName={packageName}
-                  src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]}
-                  size={30}
-                  canOpen={canOpenBundle}
-                  onOpen={openBundle}
-                />
-                <div className="dsh-atlas-manager-copy">
-                  <div className="dsh-atlas-manager-label">
-                    <BundleRowTitle
-                      packageName={packageName}
-                      displayName={t(atlas)}
-                      canOpen={canOpenBundle}
-                      onOpen={openBundle}
+              <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localDevHelp')}</p>
+              {localDevEnabled && (
+                <div className="dsh-atlas-manager-path">
+                  <label htmlFor={pathId}>{t('localWorkspaceDir')}</label>
+                  <div className="dsh-atlas-manager-path-controls">
+                    <input
+                      type="text"
+                      id={pathId}
+                      value={workspaceDir}
+                      placeholder="/path/to/plugins"
+                      spellCheck={false}
+                      autoComplete="off"
+                      aria-describedby={`${pathId}-help`}
+                      aria-invalid={!pathValid}
+                      disabled={!canEdit || busy}
+                      onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
+                      onKeyDown={event => { if (event.key === 'Enter') void saveWorkspaceDir() }}
                     />
-                    {localDevEnabled && localStatus && (localStatus.selfMode === 'local' || localStatus.membersMode === 'local') && (
-                      <span className="dsh-atlas-manager-tags">
-                        {localStatus.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-                        {localStatus.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      className="dsh-atlas-manager-retry"
+                      disabled={!canEdit || busy || !pathValid || !pathDirty}
+                      onClick={() => { void saveWorkspaceDir() }}
+                    >
+                      {t('saveWorkspaceDir')}
+                    </button>
                   </div>
-                  <div id={statusId} role="status" tabIndex={-1} ref={node => { memberStatus.current[atlas] = node }}>
-                    <p className="dsh-atlas-manager-status" data-atlas-status={status}
-                      data-error={status === 'bundleError' ? '' : undefined}>{t(status)}</p>
-                    {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-                    {atlas === 'continuity' && <p className="dsh-atlas-manager-status">{t('continuityMembers')}</p>}
-                    {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired', { dir: localAtlasDir(atlas) })}</p>}
-                    {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
-                    {notice && <NoticeLine atlas={atlas} notice={notice} />}
-                  </div>
-                  {canShowSettings && (
-                    <SettingsToggleButton
-                      packageName={packageName}
-                      count={settingsInfo.count}
-                      open={settingsOpen}
-                      panelId={panelId}
-                      onToggle={() => toggleSettings(packageName)}
-                    />
-                  )}
-                  {localDevEnabled && localStatus && (
-                    <LocalDevControls
-                      status={localStatus}
-                      busy={busy}
-                      canSwitch={canSwitchLocal}
-                      onAction={req => { void runLocalDevAction(req) }}
-                    />
-                  )}
-                  {rowError && (
-                    <p className="dsh-atlas-manager-status" data-error="" role="alert">
-                      {t(localDevErrorKey(rowError.code))}
-                      {rowError.detail ? ` (${rowError.detail})` : ''}
-                    </p>
-                  )}
-                  {detail && <details className="dsh-atlas-manager-status dsh-atlas-manager-detail">
-                    <summary>{t('details')}</summary>
-                    <code>{detail}</code>
-                  </details>}
+                  <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={!pathValid || overview?.workspaceDirIssue ? '' : undefined}>
+                    {!pathValid
+                      ? t('invalidWorkspaceDir')
+                      : overview?.workspaceDirIssue ?? t('localWorkspaceDirHelp')}
+                  </p>
                 </div>
-                <div className="dsh-atlas-manager-control">
-                  {stage && <span className="dsh-atlas-manager-spinner" aria-hidden="true" />}
-                  {showUninstall && <button type="button" className="dsh-atlas-manager-trash"
-                    aria-haspopup="dialog" aria-label={t('uninstallLabel', { name: t(atlas) })} title={t('uninstall')}
-                    disabled={busy} onClick={() => setUninstallTarget(atlas)}>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                      strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.55 8.15c.04.52.47.85 1 .85h4.9c.53 0 .96-.33 1-.85L12 4.5M6.75 7v4M9.25 7v4" />
-                    </svg>
-                  </button>}
-                  <button type="button" role="switch" className="dsh-atlas-manager-switch"
-                    aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
-                    aria-busy={stage !== undefined} aria-disabled={busy || denied || localInstallRequired || localWorkspaceRequired}
-                    disabled={denied || localInstallRequired || localWorkspaceRequired}
-                    onClick={() => {
-                      if (!busy && !denied && !localInstallRequired && !localWorkspaceRequired) {
-                        void toggle(atlas, !enabled)
-                      }
-                    }}>
-                    <span className="dsh-atlas-manager-thumb" />
-                  </button>
-                </div>
-                {settingsOpen && (
-                  <div id={panelId} className="dsh-atlas-settings-panel" data-atlas-settings-panel={packageName}>
-                    {renderDynamicFactorySlot(renderFactorySlot!, settingsInfo.factoryName, { view: 'page' })}
-                  </div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
+              )}
+              {settings.status !== 'loading' && !canEdit && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
+              {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('localDevApplyFailed')}</p>}
+            </section>
 
-        {discoveredAggregates.length > 0 && (
-          <>
-            <h5 className="dsh-atlas-manager-subheading">{t('otherAggregates')}</h5>
-            <ul className="dsh-atlas-manager-list" data-discovered-aggregates="">
-              {discoveredAggregates.map(item => {
-                const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
-                const canOpenBundle = item.installed && canNavigate
-                const settingsInfo = item.enabled ? settingsByPackage.get(item.packageName) : undefined
-                const canShowSettings = settingsInfo !== undefined && typeof renderFactorySlot === 'function'
-                const settingsOpen = canShowSettings && expandedSettings[item.packageName] === true
-                const panelId = `${listId}-settings-other-${item.packageName.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+            <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
+            <ul className="dsh-atlas-manager-list" aria-labelledby={listId}>
+              {ATLASES.map(atlas => {
+                const packageName = ATLAS_BUNDLES[atlas]
+                const bundle = inventory.find(item => item.name === packageName)
+                const localStatus = statusByPackage.get(packageName)
+                const enabled = bundle?.enabled ?? false
+                const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
+                const localInstallRequired = notInstalled && !localDevEnabled && isLocalOnlyAtlas(atlas)
+                const localWorkspaceRequired = notInstalled && localDevEnabled && savedWorkspaceDir === undefined
+                const denied = !canToggle || bundle?.readOnlyReason !== undefined
+                  || (!enabled && notInstalled && (!canInstall || (localDevEnabled && !canInspect)))
+                const showUninstall = canRemove && canUninstallAtlas(bundle)
+                const stage = activity?.atlas === atlas ? activity.stage : undefined
+                const notice = stage === undefined ? notices[atlas]?.notice : undefined
+                const detail = stage === undefined ? notice && 'detail' in notice ? notice.detail : bundle?.error?.diagnostic : undefined
+                const status = stage ?? (bundle?.error !== undefined ? 'bundleError'
+                  : enabled ? 'enabled' : notInstalled ? 'notInstalled' : 'disabled')
+                const statusId = `${listId}-${atlas}`
+                const rowError = localDevError?.packageName === packageName ? localDevError : undefined
+                const canOpenBundle = !notInstalled && canNavigate
                 return (
-                  <li key={item.packageName} className="dsh-atlas-manager-row">
+                  <li key={atlas} className="dsh-atlas-manager-row" data-atlas={atlas}>
+                    {/* Artwork sizing follows PackageArtwork in @deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5, src/client/PluginManagerPage.tsx. */}
                     <BundleRowIcon
-                      packageName={item.packageName}
-                      src={ATLAS_ICONS.plugin}
-                      size={24}
+                      packageName={packageName}
+                      src={isLocalOnlyAtlas(atlas) ? LOCAL_ICONS[atlas] : ATLAS_ICONS[atlas]}
+                      size={30}
                       canOpen={canOpenBundle}
                       onOpen={openBundle}
                     />
                     <div className="dsh-atlas-manager-copy">
                       <div className="dsh-atlas-manager-label">
                         <BundleRowTitle
-                          packageName={item.packageName}
-                          displayName={item.packageName}
+                          packageName={packageName}
+                          displayName={t(atlas)}
                           canOpen={canOpenBundle}
                           onOpen={openBundle}
                         />
-                        {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
+                        {localDevEnabled && localStatus && (localStatus.selfMode === 'local' || localStatus.membersMode === 'local') && (
                           <span className="dsh-atlas-manager-tags">
-                            {item.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-                            {item.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+                            {localStatus.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
+                            {localStatus.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
                           </span>
                         )}
                       </div>
-                      <p className="dsh-atlas-manager-status">
-                        {t(item.enabled ? 'enabled' : 'disabled')} · {item.members.length}
-                      </p>
-                      {canShowSettings && (
-                        <SettingsToggleButton
-                          packageName={item.packageName}
-                          count={settingsInfo.count}
-                          open={settingsOpen}
-                          panelId={panelId}
-                          onToggle={() => toggleSettings(item.packageName)}
-                        />
-                      )}
-                      {localDevEnabled && (
+                      <div id={statusId} role="status" tabIndex={-1} ref={node => { memberStatus.current[atlas] = node }}>
+                        <p className="dsh-atlas-manager-status" data-atlas-status={status}
+                          data-error={status === 'bundleError' ? '' : undefined}>{t(status)}</p>
+                        {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
+                        {atlas === 'continuity' && <p className="dsh-atlas-manager-status">{t('continuityMembers')}</p>}
+                        {localInstallRequired && <p className="dsh-atlas-manager-status">{t('localInstallRequired', { dir: localAtlasDir(atlas) })}</p>}
+                        {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
+                        {notice && <NoticeLine atlas={atlas} notice={notice} />}
+                      </div>
+                      {localDevEnabled && localStatus && (
                         <LocalDevControls
-                          status={item}
+                          status={localStatus}
                           busy={busy}
                           canSwitch={canSwitchLocal}
                           onAction={req => { void runLocalDevAction(req) }}
@@ -766,18 +670,129 @@ export function apply(ctx: ClientContext): void {
                           {rowError.detail ? ` (${rowError.detail})` : ''}
                         </p>
                       )}
+                      {detail && <details className="dsh-atlas-manager-status dsh-atlas-manager-detail">
+                        <summary>{t('details')}</summary>
+                        <code>{detail}</code>
+                      </details>}
                     </div>
-                    <div className="dsh-atlas-manager-control" />
-                    {settingsOpen && (
-                      <div id={panelId} className="dsh-atlas-settings-panel" data-atlas-settings-panel={item.packageName}>
-                        {renderDynamicFactorySlot(renderFactorySlot!, settingsInfo.factoryName, { view: 'page' })}
-                      </div>
-                    )}
+                    <div className="dsh-atlas-manager-control">
+                      {stage && <span className="dsh-atlas-manager-spinner" aria-hidden="true" />}
+                      {showUninstall && <button type="button" className="dsh-atlas-manager-trash"
+                        aria-haspopup="dialog" aria-label={t('uninstallLabel', { name: t(atlas) })} title={t('uninstall')}
+                        disabled={busy} onClick={() => setUninstallTarget(atlas)}>
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                          strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M2.5 4.5h11M6 4.5V2.75h4V4.5M4 4.5l.55 8.15c.04.52.47.85 1 .85h4.9c.53 0 .96-.33 1-.85L12 4.5M6.75 7v4M9.25 7v4" />
+                        </svg>
+                      </button>}
+                      <button type="button" role="switch" className="dsh-atlas-manager-switch"
+                        aria-label={t(atlas)} aria-checked={enabled} aria-describedby={statusId}
+                        aria-busy={stage !== undefined} aria-disabled={busy || denied || localInstallRequired || localWorkspaceRequired}
+                        disabled={denied || localInstallRequired || localWorkspaceRequired}
+                        onClick={() => {
+                          if (!busy && !denied && !localInstallRequired && !localWorkspaceRequired) {
+                            void toggle(atlas, !enabled)
+                          }
+                        }}>
+                        <span className="dsh-atlas-manager-thumb" />
+                      </button>
+                    </div>
                   </li>
                 )
               })}
             </ul>
-          </>
+
+            {discoveredAggregates.length > 0 && (
+              <>
+                <h5 className="dsh-atlas-manager-subheading">{t('otherAggregates')}</h5>
+                <ul className="dsh-atlas-manager-list" data-discovered-aggregates="">
+                  {discoveredAggregates.map(item => {
+                    const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
+                    const canOpenBundle = item.installed && canNavigate
+                    return (
+                      <li key={item.packageName} className="dsh-atlas-manager-row">
+                        <BundleRowIcon
+                          packageName={item.packageName}
+                          src={ATLAS_ICONS.plugin}
+                          size={24}
+                          canOpen={canOpenBundle}
+                          onOpen={openBundle}
+                        />
+                        <div className="dsh-atlas-manager-copy">
+                          <div className="dsh-atlas-manager-label">
+                            <BundleRowTitle
+                              packageName={item.packageName}
+                              displayName={item.packageName}
+                              canOpen={canOpenBundle}
+                              onOpen={openBundle}
+                            />
+                            {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
+                              <span className="dsh-atlas-manager-tags">
+                                {item.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
+                                {item.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+                              </span>
+                            )}
+                          </div>
+                          <p className="dsh-atlas-manager-status">
+                            {t(item.enabled ? 'enabled' : 'disabled')} · {item.members.length}
+                          </p>
+                          {localDevEnabled && (
+                            <LocalDevControls
+                              status={item}
+                              busy={busy}
+                              canSwitch={canSwitchLocal}
+                              onAction={req => { void runLocalDevAction(req) }}
+                            />
+                          )}
+                          {rowError && (
+                            <p className="dsh-atlas-manager-status" data-error="" role="alert">
+                              {t(localDevErrorKey(rowError.code))}
+                              {rowError.detail ? ` (${rowError.detail})` : ''}
+                            </p>
+                          )}
+                        </div>
+                        <div className="dsh-atlas-manager-control" />
+                      </li>
+                    )
+                  })}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
+        {effectiveTab === 'settings' && (
+          <div
+            role="tabpanel"
+            id={settingsPanelId}
+            aria-labelledby={settingsTabId}
+            data-atlas-panel="settings"
+            className="dsh-atlas-settings-groups"
+          >
+            {configurableBundles.map(entry => (
+              <section key={entry.packageName} className="dsh-atlas-settings-group" data-atlas-settings-group={entry.packageName}>
+                <div className="dsh-atlas-settings-group-head">
+                  <BundleRowIcon
+                    packageName={entry.packageName}
+                    src={entry.iconSrc}
+                    size={20}
+                    className="dsh-atlas-settings-group-icon"
+                    canOpen={entry.canOpen}
+                    onOpen={openBundle}
+                  />
+                  <BundleRowTitle
+                    packageName={entry.packageName}
+                    displayName={entry.displayName}
+                    canOpen={entry.canOpen}
+                    onOpen={openBundle}
+                  />
+                </div>
+                <div className="dsh-atlas-settings-group-body">
+                  {renderDynamicFactorySlot(renderFactorySlot!, entry.settings.factoryName, { view: 'page' })}
+                </div>
+              </section>
+            ))}
+          </div>
         )}
 
         <dialog ref={uninstallDialog} className="dsh-atlas-manager-uninstall-dialog"
