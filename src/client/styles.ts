@@ -25,19 +25,11 @@ export const CSS = `
 }
 .dsh-atlas-manager-path { margin-top: 8px; font-size: 13px; }
 .dsh-atlas-manager-path-controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
-.dsh-atlas-manager-path-controls > input {
+.dsh-atlas-manager-path-input {
   flex: 1 1 12rem;
   min-width: 0;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-sm);
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-layer-1);
-  font: inherit;
 }
-.dsh-atlas-manager-path-controls > button { margin-top: 0; }
-.dsh-atlas-manager-path-controls > button:disabled { cursor: default; opacity: 0.55; }
+.dsh-atlas-manager-path-controls .dsh-atlas-manager-retry { margin-top: 0; }
 .dsh-atlas-manager-heading-row {
   display: flex;
   align-items: center;
@@ -161,37 +153,17 @@ export const CSS = `
   flex-wrap: wrap;
   gap: 4px;
 }
-.dsh-atlas-local-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: 999px;
+.dsh-atlas-local-tag.dsh-atlas-local-tag {
+  height: 18px;
+  padding: 0 6px;
   font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
-  color: var(--dsw-alias-brand-primary);
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);
+  line-height: 1;
 }
 .dsh-atlas-local-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
-}
-.dsh-atlas-local-btn {
-  font: inherit;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-primary);
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  padding: 3px 8px;
-  background: var(--dsw-alias-bg-layer-1);
-  cursor: pointer;
-}
-.dsh-atlas-local-btn:disabled { cursor: default; opacity: 0.55; }
-@media (hover: hover) {
-  .dsh-atlas-local-btn:enabled:hover { background: var(--dsw-alias-interactive-bg-hover); }
 }
 .dsh-atlas-settings-toggle {
   display: inline-flex;
@@ -256,7 +228,7 @@ export const CSS = `
   }
   .dsh-atlas-detail-open:hover {
     opacity: 1;
-    color: var(--dsw-alias-brand-primary);
+    color: var(--dsw-alias-state-business-primary);
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }
@@ -287,14 +259,7 @@ export const CSS = `
 .dsh-atlas-manager-detail > summary { cursor: pointer; }
 .dsh-atlas-manager-detail > code { white-space: pre-wrap; }
 .dsh-atlas-manager-retry {
-  font: inherit;
-  color: var(--dsw-alias-label-primary);
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  padding: 4px 10px;
   margin-top: 8px;
-  background: var(--dsw-alias-bg-layer-1);
-  cursor: pointer;
 }
 .dsh-atlas-manager-control {
   display: inline-flex;
@@ -307,10 +272,14 @@ export const CSS = `
 .dsh-atlas-manager-danger,
 .dsh-atlas-manager-trash {
   color: var(--dsw-alias-state-error-primary);
+  --dsh-button-outline-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);
   border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);
 }
-.dsh-atlas-manager-danger:hover:not(:disabled), .dsh-atlas-manager-trash:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+@media (hover: hover) {
+  .dsh-atlas-manager-danger:hover:not(:disabled),
+  .dsh-atlas-manager-trash:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
+  }
 }
 .dsh-atlas-manager-trash {
   box-sizing: border-box;
@@ -321,43 +290,9 @@ export const CSS = `
   display: inline-grid;
   place-items: center;
   padding: 0;
-  border-width: 0.5px;
-  border-style: solid;
-  border-radius: var(--dsw-radius-sm, 8px);
-  background: transparent;
-  cursor: pointer;
 }
-.dsh-atlas-manager-trash:disabled { cursor: default; opacity: 0.55; }
-.dsh-atlas-manager-uninstall-dialog {
-  max-inline-size: min(25rem, calc(100% - 2rem));
-  box-sizing: border-box;
-  padding: 20px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-}
-.dsh-atlas-manager-uninstall-dialog::backdrop {
-  background: color-mix(in srgb, var(--dsw-alias-label-primary) 30%, transparent);
-}
-.dsh-atlas-manager-uninstall-dialog h4, .dsh-atlas-manager-uninstall-dialog p { margin: 0 0 8px; }
-.dsh-atlas-manager-uninstall-dialog > div { display: flex; justify-content: flex-end; gap: 8px; }
-.dsh-atlas-manager-spinner {
-  box-sizing: border-box;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--dsw-alias-border-l2);
-  border-top-color: var(--dsw-alias-brand-primary);
-  border-radius: 50%;
-  animation: dsh-atlas-manager-spin 700ms linear infinite;
-}
-@keyframes dsh-atlas-manager-spin { to { transform: rotate(1turn); } }
-.dsh-atlas-manager-retry:focus-visible,
-.dsh-atlas-manager-trash:focus-visible, .dsh-atlas-manager-path-controls > input:focus-visible,
-.dsh-atlas-local-btn:focus-visible,
 .dsh-atlas-settings-toggle:focus-visible, .dsh-atlas-detail-open:focus-visible, .dsh-atlas-expand-all:focus-visible {
-  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary));
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
 .dsh-atlas-local-detail {
@@ -407,7 +342,6 @@ export const CSS = `
   .dsh-atlas-manager-icon,
   .dsh-atlas-manager-copy,
   .dsh-atlas-detail-open { transition: none; }
-  .dsh-atlas-manager-spinner { animation: none; }
   .dsh-atlas-chevron { transition: none; }
 }
 `

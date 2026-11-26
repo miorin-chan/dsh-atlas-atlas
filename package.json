@@ -30,11 +30,7 @@
     "docs/README.md",
     "docs/DETAIL.*.md",
     "README.zh.md",
-    "CHANGELOG.md",
-    "src",
-    "scripts",
-    "tsconfig.json",
-    "tsconfig.tools.json"
+    "CHANGELOG.md"
   ],
   "engines": {
     "dsh": ">=0.2.2-rc.5"

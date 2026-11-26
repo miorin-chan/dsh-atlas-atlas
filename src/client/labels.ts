@@ -88,6 +88,7 @@ const en = {
   openBundleDetails: 'Open {name} details',
   expandAll: 'Expand all',
   collapseAll: 'Collapse all',
+  closeDialog: 'Close',
 }
 
 export type AtlasLabelKey = keyof typeof en
@@ -186,6 +187,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: '打开{name}详情页',
     expandAll: '展开全部',
     collapseAll: '折叠全部',
+    closeDialog: '关闭',
   },
   ja: {
     uninstall: 'アンインストール',
@@ -275,6 +277,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: '{name}の詳細を開く',
     expandAll: 'すべて展開',
     collapseAll: 'すべて折りたたむ',
+    closeDialog: '閉じる',
   },
   de: {
     uninstall: 'Deinstallieren',
@@ -364,6 +367,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: 'Details zu {name} öffnen',
     expandAll: 'Alle aufklappen',
     collapseAll: 'Alle zuklappen',
+    closeDialog: 'Schließen',
   },
   es: {
     uninstall: 'Desinstalar',
@@ -453,6 +457,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: 'Abrir detalles de {name}',
     expandAll: 'Expandir todo',
     collapseAll: 'Contraer todo',
+    closeDialog: 'Cerrar',
   },
   fr: {
     uninstall: 'Désinstaller',
@@ -542,6 +547,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: 'Ouvrir les détails de {name}',
     expandAll: 'Tout développer',
     collapseAll: 'Tout réduire',
+    closeDialog: 'Fermer',
   },
   pt: {
     uninstall: 'Desinstalar',
@@ -631,6 +637,7 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: 'Abrir detalhes de {name}',
     expandAll: 'Expandir tudo',
     collapseAll: 'Recolher tudo',
+    closeDialog: 'Fechar',
   },
   ru: {
     uninstall: 'Удалить',
@@ -720,5 +727,6 @@ export const LABELS: Record<'en' | 'zh' | 'ja' | 'de' | 'es' | 'fr' | 'pt' | 'ru
     openBundleDetails: 'Открыть страницу {name}',
     expandAll: 'Развернуть всё',
     collapseAll: 'Свернуть всё',
+    closeDialog: 'Закрыть',
   },
 }

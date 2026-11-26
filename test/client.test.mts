@@ -42,16 +42,52 @@ const testPrimitivesStub = {
   Button: ({
     icon,
     children,
-    variant: _variant,
-    size: _size,
+    variant,
+    size,
     ...rest
-  }: Record<string, unknown>) => createElement('button', { type: 'button', ...rest }, icon as never, children as never),
+  }: Record<string, unknown>) => createElement('button', {
+    type: 'button',
+    'data-button-variant': variant,
+    'data-button-size': size,
+    ...rest,
+  }, icon as never, children as never),
   IconChevronRightOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
   IconChevronsUpDownOutlineMedium: (props: Record<string, unknown>) => createElement('svg', props),
   IconRightUpOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
   IconTrashOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
+  Input: ({
+    className,
+    ...rest
+  }: Record<string, unknown>) => createElement('span', { className, 'data-primitive-input': '' }, createElement('input', rest)),
+  Modal: ({
+    open,
+    onClose,
+    title,
+    tone,
+    description,
+    footer,
+    closeLabel,
+  }: Record<string, unknown>) => (open
+    ? createElement('div', {
+      'data-primitive-modal': '',
+      'data-modal-tone': tone,
+      'data-modal-close-label': closeLabel,
+      'aria-label': title,
+      'aria-description': description,
+      onClose,
+    }, footer as never)
+    : null),
   PluginArtworkSubagent: () => null,
+  StateDot: ({ state, size, className }: Record<string, unknown>) => createElement('span', {
+    'data-state-dot': state,
+    'data-state-dot-size': size,
+    className,
+  }),
   Switch: SwitchStub,
+  Tag: ({ tone, className, children }: Record<string, unknown>) => createElement('span', {
+    'data-tag-tone': tone,
+    className,
+  }, children as never),
   Tooltip: ({
     children,
     side,
@@ -76,11 +112,20 @@ const testPrimitivesStub = {
 }
 const plugin = registration.factory(id => id === '@deepseek-ai/dsh-client-ui-primitives' ? testPrimitivesStub : testRequire(id))
 
-test('mounts bundle config, detail badge, and detail section slots and disposes cleanly', () => {
+test('mounts bundle config dynamically with local-dev detail slots gated on localDevEnabled and disposes cleanly', () => {
   const effects = []
   const subscriptions = new Set()
   const slots = new Map()
   const locales = new Map()
+  const formListeners = new Set<() => void>()
+  const form = {
+    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
+    getSnapshot() { return this.snapshot },
+    subscribe(listener: () => void) {
+      formListeners.add(listener)
+      return () => { formListeners.delete(listener) }
+    },
+  }
   const subscribe = event => {
     subscriptions.add(event)
     return () => subscriptions.delete(event)
@@ -89,7 +134,7 @@ test('mounts bundle config, detail badge, and detail section slots and disposes 
     effect(install) { effects.push(install()) },
     on: subscribe,
     remote: { pluginManager: {}, $on: subscribe },
-    configForms: { get(id) { assert.equal(id, 'dsh-atlas-atlas'); return {} } },
+    configForms: { get(id) { assert.equal(id, 'dsh-atlas-atlas'); return form } },
     locale: {
       bind: () => key => key,
       register(namespace, labels) {
@@ -112,8 +157,22 @@ test('mounts bundle config, detail badge, and detail section slots and disposes 
   plugin.apply(ctx)
 
   assert.equal(slots.get('plugins.bundle.config:@miorin/dsh-atlas-atlas')?.name, 'plugins.bundle.config')
+  assert.equal(slots.get('plugins.detail.badge:@miorin/dsh-atlas-atlas'), undefined)
+  assert.equal(slots.get('plugins.detail.section:@miorin/dsh-atlas-atlas'), undefined)
+
+  // Enabling localDevEnabled registers both detail slots; disabling disposes them.
+  form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
+  for (const listener of formListeners) listener()
   assert.equal(slots.get('plugins.detail.badge:@miorin/dsh-atlas-atlas')?.name, 'plugins.detail.badge')
   assert.equal(slots.get('plugins.detail.section:@miorin/dsh-atlas-atlas')?.name, 'plugins.detail.section')
+
+  form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: false } }
+  for (const listener of formListeners) listener()
+  assert.equal(slots.get('plugins.detail.badge:@miorin/dsh-atlas-atlas'), undefined)
+  assert.equal(slots.get('plugins.detail.section:@miorin/dsh-atlas-atlas'), undefined)
+
+  form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
+  for (const listener of formListeners) listener()
   assert.deepEqual([...subscriptions].sort(), ['connection/reset', 'plugin-manager/changed'])
 
   const labels = locales.get('dsh-atlas-atlas')
@@ -260,14 +319,12 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
       inject: (_, register) => register(),
       register(options, render) {
         slots.set(options.name, render)
-        return () => {}
+        return () => { slots.delete(options.name) }
       },
     },
   })
 
   const Panel = slots.get('plugins.bundle.config')!
-  const DetailSection = slots.get('plugins.detail.section')!
-  const DetailBadge = slots.get('plugins.detail.badge')!
 
   let view
   let detailView
@@ -285,8 +342,18 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
     assert.equal(visualSwitch?.props.disabled, false)
     assert.equal(view.root.findAllByProps({ 'data-discovered-aggregates': '' }).length, 1)
 
-    // When localDevEnabled is false, detail contributions render null with zero detail requests.
-    const requestsBefore = fetchRequests.length
+    // When localDevEnabled is false, detail slots are unmounted with zero detail requests.
+    assert.equal(slots.has('plugins.detail.section'), false)
+    assert.equal(slots.has('plugins.detail.badge'), false)
+
+    // Enable localDevEnabled -> detail slots mount, render both Feature 1 and Feature 2, and badge renders Tag pills.
+    await act(async () => {
+      form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
+      for (const listener of form.listeners) listener()
+    })
+    const DetailSection = slots.get('plugins.detail.section')!
+    const DetailBadge = slots.get('plugins.detail.badge')!
+    assert.ok(view.root.findByProps({ 'data-primitive-input': '' }))
     await act(async () => {
       detailView = create(createElement(DetailSection as never, {
         subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] } },
@@ -298,18 +365,10 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
         t: (key: string) => key,
       }))
     })
-    assert.equal(detailView.toJSON(), null)
-    assert.equal(badgeView.toJSON(), null)
-    assert.equal(fetchRequests.length, requestsBefore)
-
-    // Enable localDevEnabled -> detail section renders both Feature 1 and Feature 2 and badge renders tags.
-    await act(async () => {
-      form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
-      for (const listener of form.listeners) listener()
-    })
     assert.ok(detailView.root.findByProps({ 'data-local-dev-self': 'local' }))
     assert.ok(detailView.root.findByProps({ 'data-local-dev-members': 'local' }))
     assert.ok(badgeView.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-atlas-list' }))
+    assert.equal(badgeView.root.findAllByProps({ 'data-tag-tone': 'info' }).length, 2)
   } finally {
     globalThis.fetch = originalFetch
     if (view !== undefined) act(() => view.unmount())
@@ -1026,14 +1085,19 @@ test('navigates to bundle detail pages for installed official and discovered agg
     },
   }) as unknown as Response
 
+  const formListeners = new Set<() => void>()
   const form = {
     snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
     getSnapshot() { return this.snapshot },
-    subscribe: () => () => {},
+    subscribe: (listener: () => void) => {
+      formListeners.add(listener)
+      return () => { formListeners.delete(listener) }
+    },
     async mutate() { return true },
   }
 
   let hasNavigation = true
+  const removedBundles: string[] = []
   const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
   plugin.apply({
     effect(install) { effects.push(install()) },
@@ -1058,6 +1122,10 @@ test('navigates to bundle detail pages for installed official and discovered agg
             ],
           }
         },
+        async removeBundle(name: string) {
+          removedBundles.push(name)
+          return { ok: true, value: { application: 'applied' } }
+        },
       },
       $on: () => () => {},
     },
@@ -1067,7 +1135,7 @@ test('navigates to bundle detail pages for installed official and discovered agg
       inject: (_: string, register: () => () => void) => register(),
       register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
         slots.set(options.name, render)
-        return () => {}
+        return () => { slots.delete(options.name) }
       },
     },
   })
@@ -1090,6 +1158,21 @@ test('navigates to bundle detail pages for installed official and discovered agg
     assert.equal(view!.root.findAllByProps({ 'data-atlas-open': '@miorin/dsh-atlas-workspace' }).length, 0)
     assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
 
+    // Verify scoped/modernized CSS and native Modal uninstall confirmation.
+    const panelStyleText = String(view!.root.findByType('style').children[0] ?? '')
+    assert.doesNotMatch(panelStyleText, /--dsw-alias-brand-primary/)
+    assert.match(panelStyleText, /@media \(hover: hover\)[\s\S]*\.dsh-atlas-manager-danger:hover:not\(:disabled\)/)
+    assert.equal(view!.root.findAllByProps({ 'data-primitive-modal': '' }).length, 0)
+    const trashBtn = view!.root.findByProps({ className: 'dsh-atlas-manager-trash' })
+    await act(async () => { trashBtn.props.onClick() })
+    const uninstallModal = view!.root.findByProps({ 'data-primitive-modal': '' })
+    assert.equal(uninstallModal.props['data-modal-tone'], 'warning')
+    assert.equal(uninstallModal.props['data-modal-close-label'], 'closeDialog')
+    assert.ok(uninstallModal.findByProps({ 'data-modal-autofocus': '' }))
+    const dangerBtn = uninstallModal.findByProps({ className: 'dsh-atlas-manager-danger' })
+    await act(async () => { dangerBtn.props.onClick() })
+    assert.deepEqual(removedBundles, ['@miorin/dsh-atlas-list'])
+
     visualOpen.props.onClick()
     listOpen.props.onClick()
     customOpen.props.onClick()
@@ -1107,8 +1190,10 @@ test('navigates to bundle detail pages for installed official and discovered agg
     assert.equal(view!.root.findAll(node => typeof node.props['data-atlas-open'] === 'string').length, 0)
     assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
 
-    const BadgeSlot = slots.get('plugins.detail.badge')!
+    assert.equal(slots.get('plugins.detail.badge'), undefined)
     form.snapshot = { ...form.snapshot, value: { localDevEnabled: true, localWorkspaceDir: '/tmp/ws' } }
+    for (const listener of formListeners) listener()
+    const BadgeSlot = slots.get('plugins.detail.badge')!
     const badgeFetch = (async () => new Response(JSON.stringify({
       ok: true,
       value: {
@@ -1137,6 +1222,7 @@ test('navigates to bundle detail pages for installed official and discovered agg
       })
       assert.equal(badgeView!.root.findAllByType('style').length, 1, 'LocalDevBadge mounts styles independently')
       assert.ok(badgeView!.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-atlas-visual' }))
+      assert.equal(badgeView!.root.findAllByProps({ 'data-tag-tone': 'info' }).length, 1)
     } finally {
       if (badgeView !== undefined) act(() => badgeView.unmount())
     }

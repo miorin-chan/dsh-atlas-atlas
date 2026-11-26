@@ -10,7 +10,11 @@ import {
   IconChevronsUpDownOutlineMedium,
   IconRightUpOutlineRegular,
   IconTrashOutlineRegular,
+  Input,
+  Modal,
+  StateDot,
   Switch,
+  Tag,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -198,53 +202,58 @@ export function apply(ctx: ClientContext): void {
     return (
       <div className="dsh-atlas-local-actions">
         {status.drifted ? (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             className="dsh-atlas-local-btn"
             disabled={busy || !canSwitch}
             onClick={() => onAction({ action: 'reset-drift', packageName: status.packageName })}
           >
             {t('resetDrift')}
-          </button>
+          </Button>
         ) : (
           <>
             {status.selfMode === 'baseline' ? (
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 className="dsh-atlas-local-btn"
                 disabled={busy || !canSwitch || !status.canSwitchSelfToLocal}
                 onClick={() => onAction({ action: 'set-self-mode', packageName: status.packageName, mode: 'local' })}
               >
                 {t('switchToLocal')}
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 className="dsh-atlas-local-btn"
                 disabled={busy || !canSwitch || !status.canRestoreSelf}
                 onClick={() => onAction({ action: 'set-self-mode', packageName: status.packageName, mode: 'baseline' })}
               >
                 {t('restoreBaseline')}
-              </button>
+              </Button>
             )}
             {status.isAggregate && (status.membersMode === 'bundled' ? (
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 className="dsh-atlas-local-btn"
                 disabled={busy || !canSwitch || !status.canSwitchMembersToLocal}
                 onClick={() => onAction({ action: 'set-members-mode', packageName: status.packageName, mode: 'local' })}
               >
                 {t('switchMembersToLocal')}
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 className="dsh-atlas-local-btn"
                 disabled={busy || !canSwitch || !status.canRestoreMembers}
                 onClick={() => onAction({ action: 'set-members-mode', packageName: status.packageName, mode: 'bundled' })}
               >
                 {t('restoreMembersBundled')}
-              </button>
+              </Button>
             ))}
           </>
         )}
@@ -323,8 +332,6 @@ export function apply(ctx: ClientContext): void {
     const settings = useSyncExternalStore(subscribeForm, formSnapshot, formSnapshot)
     const [draft, setDraft] = useState<string>()
     const [uninstallTarget, setUninstallTarget] = useState<Atlas>()
-    const uninstallDialog = useRef<HTMLDialogElement>(null)
-    const cancelUninstall = useRef<HTMLButtonElement>(null)
     const memberStatus = useRef<Partial<Record<Atlas, HTMLDivElement | null>>>({})
     const [saving, setSaving] = useState(false)
     const [saveFailed, setSaveFailed] = useState(false)
@@ -369,13 +376,6 @@ export function apply(ctx: ClientContext): void {
       }
     }, [canList, localDevEnabled, settings.value?.localWorkspaceDir])
 
-    useEffect(() => {
-      const dialog = uninstallDialog.current
-      if (uninstallTarget === undefined || !dialog || dialog.open) return
-      dialog.showModal()
-      cancelUninstall.current?.focus()
-    }, [uninstallTarget])
-
     if (!canList) return <p className="dsh-atlas-manager-status">{t('readDenied')}</p>
     if (inventory === undefined) return <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
     if (inventory === 'failed') return (
@@ -392,7 +392,7 @@ export function apply(ctx: ClientContext): void {
             </div>
           })}
         </div>
-        <button type="button" className="dsh-atlas-manager-retry" onClick={() => { void refresh() }}>{t('retry')}</button>
+        <Button variant="outline" size="sm" className="dsh-atlas-manager-retry" onClick={() => { void refresh() }}>{t('retry')}</Button>
       </div>
     )
 
@@ -570,9 +570,10 @@ export function apply(ctx: ClientContext): void {
             <div className="dsh-atlas-manager-path">
               <label htmlFor={pathId}>{t('localWorkspaceDir')}</label>
               <div className="dsh-atlas-manager-path-controls">
-                <input
+                <Input
                   type="text"
                   id={pathId}
+                  className="dsh-atlas-manager-path-input"
                   value={workspaceDir}
                   placeholder="/path/to/plugins"
                   spellCheck={false}
@@ -583,14 +584,15 @@ export function apply(ctx: ClientContext): void {
                   onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
                   onKeyDown={event => { if (event.key === 'Enter') void saveWorkspaceDir() }}
                 />
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="dsh-atlas-manager-retry"
                   disabled={!canEdit || busy || !pathValid || !pathDirty}
                   onClick={() => { void saveWorkspaceDir() }}
                 >
                   {t('saveWorkspaceDir')}
-                </button>
+                </Button>
               </div>
               <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={!pathValid || overview?.workspaceDirIssue ? '' : undefined}>
                 {!pathValid
@@ -674,8 +676,8 @@ export function apply(ctx: ClientContext): void {
                       )}
                       {localDevEnabled && localStatus && (localStatus.selfMode === 'local' || localStatus.membersMode === 'local') && (
                         <span className="dsh-atlas-manager-tags">
-                          {localStatus.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-                          {localStatus.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+                          {localStatus.selfMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localPackageTag')}</Tag>}
+                          {localStatus.membersMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localMembersTag')}</Tag>}
                         </span>
                       )}
                     </div>
@@ -711,7 +713,7 @@ export function apply(ctx: ClientContext): void {
                     </details>}
                   </div>
                   <div className="dsh-atlas-manager-control">
-                    {stage && <span className="dsh-atlas-manager-spinner" aria-hidden="true" />}
+                    {stage && <StateDot state="ongoing" size={14} className="dsh-atlas-manager-spinner" />}
                     {showUninstall && (
                       <Tooltip label={t('uninstall')} side="top" portal delayMs={200}>
                         <Button
@@ -792,8 +794,8 @@ export function apply(ctx: ClientContext): void {
                           )}
                           {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
                             <span className="dsh-atlas-manager-tags">
-                              {item.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-                              {item.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+                              {item.selfMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localPackageTag')}</Tag>}
+                              {item.membersMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localMembersTag')}</Tag>}
                             </span>
                           )}
                         </div>
@@ -833,23 +835,41 @@ export function apply(ctx: ClientContext): void {
           </>
         )}
 
-        <dialog ref={uninstallDialog} className="dsh-atlas-manager-uninstall-dialog"
-          aria-labelledby={`${listId}-uninstall-title`} aria-describedby={`${listId}-uninstall-description`}
-          onClose={() => setUninstallTarget(undefined)}>
-          <h4 id={`${listId}-uninstall-title`}>{uninstallTarget && t('uninstallLabel', { name: t(uninstallTarget) })}</h4>
-          <p id={`${listId}-uninstall-description`}>{t('uninstallConfirm')}</p>
-          <div>
-            <button type="button" ref={cancelUninstall} className="dsh-atlas-manager-retry"
-              onClick={() => uninstallDialog.current?.close()}>{t('cancelUninstall')}</button>
-            <button type="button" className="dsh-atlas-manager-retry dsh-atlas-manager-danger"
-              disabled={!canRemove || busy || uninstallTarget === undefined} onClick={() => {
-                if (uninstallTarget === undefined || !canRemove || busy) return
-                uninstallDialog.current?.close()
-                memberStatus.current[uninstallTarget]?.focus()
-                void uninstall(uninstallTarget)
-              }}>{t('uninstall')}</button>
-          </div>
-        </dialog>
+        <Modal
+          open={uninstallTarget !== undefined}
+          onClose={() => setUninstallTarget(undefined)}
+          title={uninstallTarget ? t('uninstallLabel', { name: t(uninstallTarget) }) : ''}
+          tone="warning"
+          description={t('uninstallConfirm')}
+          closeLabel={t('closeDialog')}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                data-modal-autofocus=""
+                onClick={() => setUninstallTarget(undefined)}
+              >
+                {t('cancelUninstall')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="dsh-atlas-manager-danger"
+                disabled={!canRemove || busy || uninstallTarget === undefined}
+                onClick={() => {
+                  if (uninstallTarget === undefined || !canRemove || busy) return
+                  const target = uninstallTarget
+                  setUninstallTarget(undefined)
+                  memberStatus.current[target]?.focus()
+                  void uninstall(target)
+                }}
+              >
+                {t('uninstall')}
+              </Button>
+            </>
+          }
+        />
       </div>
     )
   }
@@ -868,43 +888,68 @@ export function apply(ctx: ClientContext): void {
         <AtlasPanel {...props} />
       </>
     )))
-    const detailBadge = ctx.slots.inject(DETAIL_BADGE_SLOT, () => ctx.slots.register({
-      name: DETAIL_BADGE_SLOT,
-      id: PACKAGE,
-      locale: NS,
-    }, ({ subject, t: slotT }: DetailBadgeSlotProps & { t: AtlasPanelLocale }) => (
-      <LocalDevBadge
-        subject={subject}
-        form={localDevForm}
-        t={slotT}
-        subscribeUpdates={subscribeLocalDevUpdate}
-      />
-    )))
-    const detailSection = ctx.slots.inject(DETAIL_SECTION_SLOT, () => ctx.slots.register({
-      name: DETAIL_SECTION_SLOT,
-      id: PACKAGE,
-      locale: NS,
-    }, ({ subject, t: slotT, useRemoteAccess }: DetailSectionSlotProps & { t: AtlasPanelLocale }) => {
-      const canInstall = useRemoteAccess('pluginManager/installBundle')
-      const canRemove = useRemoteAccess('pluginManager/removeBundle')
-      return (
-        <LocalDevDetailSection
-          subject={subject}
-          form={localDevForm}
-          t={slotT}
-          canSwitch={canInstall && canRemove}
-          subscribeUpdates={subscribeLocalDevUpdate}
-          notifyUpdate={() => {
-            emitLocalDevUpdate()
-            if (observing) void refresh()
-          }}
-        />
-      )
-    }))
+    let detailBadge: (() => void) | undefined
+    let detailSection: (() => void) | undefined
+    const disposeDetailSlots = () => {
+      detailSection?.()
+      detailSection = undefined
+      detailBadge?.()
+      detailBadge = undefined
+    }
+    const syncDetailSlots = () => {
+      if (disposed) return
+      const enabled = typeof localDevForm?.getSnapshot === 'function'
+        && localDevForm.getSnapshot().value?.localDevEnabled === true
+      if (!enabled) {
+        disposeDetailSlots()
+        return
+      }
+      if (detailBadge === undefined) {
+        detailBadge = ctx.slots.inject(DETAIL_BADGE_SLOT, () => ctx.slots.register({
+          name: DETAIL_BADGE_SLOT,
+          id: PACKAGE,
+          locale: NS,
+        }, ({ subject, t: slotT }: DetailBadgeSlotProps & { t: AtlasPanelLocale }) => (
+          <LocalDevBadge
+            subject={subject}
+            form={localDevForm}
+            t={slotT}
+            subscribeUpdates={subscribeLocalDevUpdate}
+          />
+        )))
+      }
+      if (detailSection === undefined) {
+        detailSection = ctx.slots.inject(DETAIL_SECTION_SLOT, () => ctx.slots.register({
+          name: DETAIL_SECTION_SLOT,
+          id: PACKAGE,
+          locale: NS,
+        }, ({ subject, t: slotT, useRemoteAccess }: DetailSectionSlotProps & { t: AtlasPanelLocale }) => {
+          const canInstall = useRemoteAccess('pluginManager/installBundle')
+          const canRemove = useRemoteAccess('pluginManager/removeBundle')
+          return (
+            <LocalDevDetailSection
+              subject={subject}
+              form={localDevForm}
+              t={slotT}
+              canSwitch={canInstall && canRemove}
+              subscribeUpdates={subscribeLocalDevUpdate}
+              notifyUpdate={() => {
+                emitLocalDevUpdate()
+                if (observing) void refresh()
+              }}
+            />
+          )
+        }))
+      }
+    }
+    syncDetailSlots()
+    const unsubscribeForm = typeof localDevForm?.subscribe === 'function'
+      ? localDevForm.subscribe(syncDetailSlots)
+      : () => {}
     return () => {
       disposed = true
-      detailSection()
-      detailBadge()
+      unsubscribeForm()
+      disposeDetailSlots()
       panel()
       reset()
       changed()

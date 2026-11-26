@@ -1,3 +1,4 @@
+import { Button, Tag } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PluginDetailProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { useEffect, useState, useSyncExternalStore } from 'react'
@@ -71,8 +72,8 @@ export function LocalDevBadge({ subject, form, t, subscribeUpdates }: LocalDevBa
     <>
       <style>{CSS}</style>
       <span className="dsh-atlas-manager-tags" data-atlas-local-badges={status.packageName}>
-        {status.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-        {status.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+        {status.selfMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localPackageTag')}</Tag>}
+        {status.membersMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localMembersTag')}</Tag>}
       </span>
     </>
   )
@@ -155,14 +156,15 @@ export function LocalDevDetailSection({
           <div className="dsh-atlas-local-feature-info">
             <span className="dsh-atlas-local-feature-title">{t('driftedNotice')}</span>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             className="dsh-atlas-local-btn"
             disabled={working || !canSwitch}
             onClick={() => { void runAction({ action: 'reset-drift', packageName }) }}
           >
             {t('resetDrift')}
-          </button>
+          </Button>
         </div>
       )}
       {status !== undefined && (
@@ -179,23 +181,25 @@ export function LocalDevDetailSection({
             </div>
             <div>
               {status.selfMode === 'baseline' ? (
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="dsh-atlas-local-btn"
                   disabled={working || !canSwitch || !status.canSwitchSelfToLocal}
                   onClick={() => { void runAction({ action: 'set-self-mode', packageName, mode: 'local' }) }}
                 >
                   {t('switchToLocal')}
-                </button>
+                </Button>
               ) : (
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="dsh-atlas-local-btn"
                   disabled={working || !canSwitch || !status.canRestoreSelf}
                   onClick={() => { void runAction({ action: 'set-self-mode', packageName, mode: 'baseline' }) }}
                 >
                   {t('restoreBaseline')}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -213,23 +217,25 @@ export function LocalDevDetailSection({
                 </div>
                 <div>
                   {status.membersMode === 'bundled' ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="dsh-atlas-local-btn"
                       disabled={working || !canSwitch || !status.canSwitchMembersToLocal}
                       onClick={() => { void runAction({ action: 'set-members-mode', packageName, mode: 'local' }) }}
                     >
                       {t('switchMembersToLocal')}
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      type="button"
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="dsh-atlas-local-btn"
                       disabled={working || !canSwitch || !status.canRestoreMembers}
                       onClick={() => { void runAction({ action: 'set-members-mode', packageName, mode: 'bundled' }) }}
                     >
                       {t('restoreMembersBundled')}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
