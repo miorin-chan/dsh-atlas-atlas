@@ -1106,6 +1106,46 @@ test('navigates to bundle detail pages for installed official and discovered agg
     })
     assert.equal(view!.root.findAll(node => typeof node.props['data-atlas-open'] === 'string').length, 0)
     assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
+
+    const BadgeSlot = slots.get('plugins.detail.badge')!
+    form.snapshot = { ...form.snapshot, value: { localDevEnabled: true, localWorkspaceDir: '/tmp/ws' } }
+    const badgeFetch = (async () => new Response(JSON.stringify({
+      ok: true,
+      value: {
+        packageName: '@miorin/dsh-atlas-visual',
+        isAggregate: true,
+        selfMode: 'local',
+        membersMode: 'baseline',
+        hasLocalCheckout: true,
+        localCheckoutDir: '/tmp/ws/dsh-atlas-visual',
+        baselineSpec: '0.1.0',
+        installedSpec: 'link:/tmp/ws/dsh-atlas-visual',
+        baselineReady: true,
+        drift: null,
+        lastError: null,
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch
+    globalThis.fetch = badgeFetch
+    let badgeView: ReturnType<typeof create> | undefined
+    try {
+      await act(async () => {
+        badgeView = create(createElement(BadgeSlot as never, {
+          subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-visual', installed: true } },
+          t: (key: string) => key,
+        }))
+        await Promise.resolve()
+      })
+      assert.equal(badgeView!.root.findAllByType('style').length, 1, 'LocalDevBadge mounts styles independently')
+      assert.ok(badgeView!.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-atlas-visual' }))
+    } finally {
+      if (badgeView !== undefined) act(() => badgeView.unmount())
+    }
+
+    const pkgJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      scripts?: Record<string, string>
+    }
+    assert.equal(pkgJson.scripts?.prepack, 'npm run build 1>&2')
+    assert.match(pkgJson.scripts?.['sync:atlas-icons'] ?? '', /scripts\/build\.mjs/)
   } finally {
     globalThis.fetch = originalFetch
     if (view !== undefined) act(() => view.unmount())

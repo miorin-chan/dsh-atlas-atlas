@@ -68,10 +68,13 @@ export function LocalDevBadge({ subject, form, t, subscribeUpdates }: LocalDevBa
   if (status.selfMode !== 'local' && status.membersMode !== 'local') return null
 
   return (
-    <span className="dsh-atlas-manager-tags" data-atlas-local-badges={status.packageName}>
-      {status.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
-      {status.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
-    </span>
+    <>
+      <style>{CSS}</style>
+      <span className="dsh-atlas-manager-tags" data-atlas-local-badges={status.packageName}>
+        {status.selfMode === 'local' && <span className="dsh-atlas-local-tag">{t('localPackageTag')}</span>}
+        {status.membersMode === 'local' && <span className="dsh-atlas-local-tag">{t('localMembersTag')}</span>}
+      </span>
+    </>
   )
 }
 
