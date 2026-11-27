@@ -15,4 +15,12 @@ DSH 在首次开启尚未安装的成员包时会从 npm 公共 registry 安装�
 需要在 npm 与本地工作区源码仓库之间切换包或单个子插件来源时，
 可在开发 profile 中安装独立插件 [开发模块化改良计划](../dsh-atlas-dev/README.zh.md)（`@miorin/dsh-atlas-dev`）。
 
+## 实拍截图
+
+「模块模块化改良计划」中展开了「移动端模块化改良计划」，显示两个成员插件的开关。
+
+![移动端模块化改良计划展开后显示两个成员插件的开关](docs/assets/screenshots/main-light.png)
+
+[深色模式主图](docs/assets/screenshots/main-dark.png)
+
 [开发与验证](docs/README.md)

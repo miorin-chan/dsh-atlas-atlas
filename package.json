@@ -29,6 +29,8 @@
     "AGENTS.local.md",
     "docs/README.md",
     "docs/DETAIL.*.md",
+    "docs/assets/screenshots/main-dark.png",
+    "docs/assets/screenshots/main-light.png",
     "README.zh.md",
     "CHANGELOG.md"
   ],

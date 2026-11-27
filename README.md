@@ -19,4 +19,13 @@ For local repository switching across `@miorin/dsh-atlas-atlas`, aggregate bundl
 install [Development Modular Improvement Plan](../dsh-atlas-dev/README.md) (`@miorin/dsh-atlas-dev`)
 in a developer profile.
 
+## Screenshots
+
+The **Atlas Modular Improvement Plan** shows the **Mobile Modular Improvement Plan** expanded, with two member switches.
+The screenshots show the Chinese UI.
+
+![Mobile Modular Improvement Plan expanded to show two member switches](docs/assets/screenshots/main-light.png)
+
+[Main view in dark mode](docs/assets/screenshots/main-dark.png)
+
 [Development and verification](docs/README.md)
