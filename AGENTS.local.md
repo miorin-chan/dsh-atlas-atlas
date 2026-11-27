@@ -18,9 +18,9 @@ Check whether new behavior belongs in its own bundle.
 - [src/lib/atlas.ts](src/lib/atlas.ts) declares the official Atlas bundle names and handles bundle enablement
   and removal.
 - [src/lib/local-dev-service.ts](src/lib/local-dev-service.ts)
-  and [src/lib/overlay-builder.ts](src/lib/overlay-builder.ts) implement stateless binary local/npm source
-  switching (direct link for single bundles and profile-private overlay assembly for aggregate bundles)
-  under `<profileDir>/dsh-atlas-local-dev/overlays/`.
+  and [src/lib/overlay-builder.ts](src/lib/overlay-builder.ts) implement stateless local/npm source switching
+  (direct link for single bundles, and parent-gated per-member local/npm overlay assembly
+  for local aggregate bundles) under `<profileDir>/dsh-atlas-local-dev/overlays/`.
 - Keep the plugin detail page short.
   Set `meta.title` and `meta.description` in `locale/*.json` for the DSH interface language.
   Use `meta.detail` in each locale to select a short, packaged Markdown document when needed.

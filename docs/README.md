@@ -34,21 +34,28 @@
 ## 本地开发切换（npm 与本地仓库二态）
 
 Host 在 `Config` 中维护 `localDevEnabled`（默认 `false`）和 `localWorkspaceDir`（默认 `''`），
-并通过受浏览器会话鉴权的 `POST /api/dsh-atlas-local-dev` 路由提供 `overview`、`inspect`、`prepare-local`
-与 `switch`（`local` | `npm`）：
+并通过受浏览器会话鉴权的 `POST /api/dsh-atlas-local-dev` 路由提供 `overview`、`inspect`、`prepare-local`、
+`switch`（`local` | `npm`）与 `switch-member`（聚合包内单成员 `local` | `npm`）：
 
 - **无状态单一事实源**：管理卡不在磁盘维护第二套 `state.json` 或 baseline 版本记忆，
-  直接根据 DSH 返回的 `BundleInfo.source`（`link:` 判定为 `local`，registry 判定为 `npm`）识别当前模式。
+  直接根据 DSH 返回的 `BundleInfo.source`（`link:` 判定为 `local`，
+  registry 判定为 `npm`）与已安装目录的依赖软链真实路径识别聚合包及每个成员的当前模式。
 - **切换到本地（`mode: 'local'`）**：
   - 普通单插件直接链接 `link:<localWorkspaceDir>/<basename>`；
-  - 声明 `dsh.aggregate` 的聚合包以 `<localWorkspaceDir>/<basename>` 为底在 profile 私有
-    目录 `<profileDir>/dsh-atlas-local-dev/overlays/<safePkg>/<id>/` 合成 overlay，
-    用 `yaml` AST 重新合并全部本地直接成员的 `cordis.patch.yml` 并挂载本地软链，绝不写入用户源码目录。
+  - 声明 `dsh.aggregate` 的聚合包，若全部成员均已在 `<localWorkspaceDir>` 就绪，
+    则在 profile 私有目录 `<profileDir>/dsh-atlas-local-dev/overlays/<safePkg>/<id>/` 合成全本地 overlay；
+    若部分成员仅存在于聚合包自带依赖中，也可先直接链接 `link:<localWorkspaceDir>/<basename>`（不阻塞切换到本地），
+    或随后用「全部切到本地」一键升级为全本地 overlay。
+- **上级本地门控的逐成员切换（`switch-member`）**：仅当聚合包本身处于 `local` 模式时开放；
+  将单个成员切到 `local` 会从 `<localWorkspaceDir>/<member>` 链接该成员并合成混合 overlay，
+  其余仍为 `npm` 的成员继续链接 `<localWorkspaceDir>/<basename>/node_modules` 中的随包依赖；当所有成员都
+  切回 `npm` 时自动退回直接链接 `link:<localWorkspaceDir>/<basename>` 并清理 overlay 目录（全程不写入用户源码目录）。
 - **切回 npm（`mode: 'npm'`）**：直接移除本地/overlay 安装并从 npm 公共 registry 安装最新发行版（保留原 `enabled` 状态；
   不需要配置 `localWorkspaceDir`），替换成功后再回收旧 overlay 目录；
   若安装失败则保留原 overlay 并尽最大努力恢复原本地安装。
-- `localDevEnabled` 关闭时，详情页动态卸载 `plugins.detail.badge` 与 `plugins.detail.section`；开启后仅在
-  已安装的第三方可管理包详情页显示轻量「本地」徽章与单一「插件来源」切换区（聚合包附带子插件本地检出状态折叠列表）。
+- `localDevEnabled` 关闭时，详情页动态卸载 `plugins.detail.badge` 与 `plugins.detail.section`；
+  开启后不仅支持已安装第三方包详情页（`subject.kind === 'bundle'`），
+  还支持本地聚合包内子插件行详情页（`subject.kind === 'row'`），部分本地的聚合包徽章显示 `本地 (k/n)`。
 
 成员已安装、已停用且可卸载时，成员开关旁显示红色垃圾桶。
 确认时重新检查成员状态，再调用 DSH 的 `removeBundle`。

@@ -48,7 +48,7 @@ import type {
 } from '../lib/local-dev-types.js'
 import { LABELS, localDevErrorKey, type AtlasLabelKey } from './labels.js'
 import { fetchLocalDevOverview, prepareBundleLocalDev, requestLocalDev } from './local-dev-api.js'
-import { LocalDevBadge, LocalDevDetailSection } from './local-dev-detail.js'
+import { LocalDevBadge, LocalDevDetailSection, localTagText, MemberLocalDevList } from './local-dev-detail.js'
 import { ATLAS_ICONS } from './published-icons.js'
 import { CSS } from './styles.js'
 
@@ -206,29 +206,53 @@ export function apply(ctx: ClientContext): void {
   }) {
     if (!status.installed) return null
     return (
-      <div className="dsh-atlas-local-actions">
-        {status.mode === 'npm' ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="dsh-atlas-local-btn"
-            disabled={busy || !canSwitch || !status.canSwitchToLocal}
-            onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'local' })}
-          >
-            {t('switchToLocal')}
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="dsh-atlas-local-btn"
-            disabled={busy || !canSwitch || !status.canSwitchToNpm}
-            onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'npm' })}
-          >
-            {t('switchToNpm')}
-          </Button>
+      <>
+        <div className="dsh-atlas-local-actions">
+          {status.mode === 'npm' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="dsh-atlas-local-btn"
+              disabled={busy || !canSwitch || !status.canSwitchToLocal}
+              onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'local' })}
+            >
+              {t('switchToLocal')}
+            </Button>
+          ) : (
+            <>
+              {status.canSwitchToLocal && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="dsh-atlas-local-btn"
+                  disabled={busy || !canSwitch}
+                  onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'local' })}
+                >
+                  {t('switchAllToLocal')}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="dsh-atlas-local-btn"
+                disabled={busy || !canSwitch || !status.canSwitchToNpm}
+                onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'npm' })}
+              >
+                {t('switchToNpm')}
+              </Button>
+            </>
+          )}
+        </div>
+        {status.isAggregate && status.mode === 'local' && status.members.length > 0 && (
+          <MemberLocalDevList
+            status={status}
+            busy={busy}
+            canSwitch={canSwitch}
+            t={t}
+            onAction={onAction}
+          />
         )}
-      </div>
+      </>
     )
   }
 
@@ -647,7 +671,7 @@ export function apply(ctx: ClientContext): void {
                       )}
                       {localDevEnabled && localStatus?.mode === 'local' && (
                         <span className="dsh-atlas-manager-tags">
-                          <Tag tone="info" className="dsh-atlas-local-tag">{t('localSourceTag')}</Tag>
+                          <Tag tone="info" className="dsh-atlas-local-tag">{localTagText(localStatus, t)}</Tag>
                         </span>
                       )}
                     </div>
@@ -764,7 +788,7 @@ export function apply(ctx: ClientContext): void {
                           )}
                           {localDevEnabled && item.mode === 'local' && (
                             <span className="dsh-atlas-manager-tags">
-                              <Tag tone="info" className="dsh-atlas-local-tag">{t('localSourceTag')}</Tag>
+                              <Tag tone="info" className="dsh-atlas-local-tag">{localTagText(item, t)}</Tag>
                             </span>
                           )}
                         </div>

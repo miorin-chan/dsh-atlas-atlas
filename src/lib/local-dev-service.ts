@@ -1,11 +1,12 @@
 import type { BundleInfo, ChangeResult, InstallBundleOptions, PluginSpecInspection } from '@deepseek-ai/dsh-plugin-manager'
-import { rm } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
-import { realpath } from 'node:fs/promises'
+import { realpath, rm } from 'node:fs/promises'
+import { isAbsolute, join, sep } from 'node:path'
 import {
   inspectSiblingCheckout,
+  isInside,
   readCheckedBundle,
   resolveBundleRootFromInfo,
+  resolveInstalledDependency,
   validateWorkspaceDir,
   type CheckedBundle,
 } from './bundle-inspector.js'
@@ -70,12 +71,73 @@ async function sameSpec(a: string | undefined, b: string | undefined): Promise<b
   }
 }
 
+function sameSet(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  if (a.size !== b.size) return false
+  for (const item of a) {
+    if (!b.has(item)) return false
+  }
+  return true
+}
+
 function isAccepted(result: ChangeResult): boolean {
   return result.error === undefined && (result.application === 'applied' || result.application === 'restart-required')
 }
 
 function changeDiagnostic(result: ChangeResult): string {
   return result.error?.diagnostic ?? result.warnings?.join('\n') ?? result.application
+}
+
+async function isMemberLocalPath(
+  resolvedRoot: string,
+  realWorkspaceDir: string | undefined,
+  memberName: string,
+): Promise<boolean> {
+  const realResolved = await realpath(resolvedRoot).catch(() => resolvedRoot)
+  if (realWorkspaceDir !== undefined) {
+    const expected = join(realWorkspaceDir, packageBasename(memberName))
+    const realExpected = await realpath(expected).catch(() => expected)
+    return realResolved === realExpected
+  }
+  return !realResolved.split(sep).includes('node_modules')
+}
+
+async function resolveBundledMemberRoot(
+  localAggregateRoot: string,
+  memberName: string,
+  realWorkspaceDir: string | undefined,
+  realProfileDir: string,
+): Promise<string | undefined> {
+  const resolved = await resolveInstalledDependency(localAggregateRoot, memberName)
+  if (resolved === undefined) return undefined
+  if (isInside(realProfileDir, resolved)) return undefined
+  if (await isMemberLocalPath(resolved, realWorkspaceDir, memberName)) return undefined
+  return resolved
+}
+
+async function allMembersAvailableLocally(workspaceDir: string, plugins: readonly string[]): Promise<boolean> {
+  for (const memberName of plugins) {
+    try {
+      await inspectSiblingCheckout(workspaceDir, memberName)
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+async function readInstalledLocalMembers(
+  installedRoot: string,
+  plugins: readonly string[],
+  realWorkspaceDir: string | undefined,
+): Promise<Set<string>> {
+  const local = new Set<string>()
+  for (const memberName of plugins) {
+    const resolved = await resolveInstalledDependency(installedRoot, memberName)
+    if (resolved !== undefined && await isMemberLocalPath(resolved, realWorkspaceDir, memberName)) {
+      local.add(memberName)
+    }
+  }
+  return local
 }
 
 export class LocalDevService {
@@ -91,6 +153,8 @@ export class LocalDevService {
         return this.inspectBundle(request.packageName)
       case 'switch':
         return this.switchSource(request.packageName, request.mode)
+      case 'switch-member':
+        return this.switchMember(request.packageName, request.memberName, request.mode)
       case 'prepare-local':
         return this.prepareLocal(request.packageName)
     }
@@ -150,7 +214,7 @@ export class LocalDevService {
       const bundles = await this.options.manager.listBundles()
       const currentlyInstalled = bundles.some(item => item.name === packageName && item.installed)
 
-      if (checkout.aggregate) {
+      if (checkout.aggregate && await allMembersAvailableLocally(workspaceDir, checkout.aggregate.plugins)) {
         const overlay = await buildLocalOverlay({
           profileDir: this.options.profileDir,
           baseBundle: checkout,
@@ -170,7 +234,7 @@ export class LocalDevService {
       return {
         spec: `link:${checkout.root}`,
         version: checkout.version,
-        isAggregate: false,
+        isAggregate: checkout.aggregate !== undefined,
       }
     } finally {
       this.busy = false
@@ -189,18 +253,36 @@ export class LocalDevService {
       this.assertManageable(bundle)
 
       const currentMode: SourceMode = isLocalSource(bundle) ? 'local' : 'npm'
-      if (currentMode === mode) {
-        return await this.inspectBundle(packageName)
-      }
 
       if (mode === 'local') {
         const workspaceDir = await validateWorkspaceDir(this.options.getWorkspaceDir())
         const checkout = await inspectSiblingCheckout(workspaceDir, packageName)
 
+        if (currentMode === 'local') {
+          if (!checkout.aggregate) {
+            return await this.inspectBundle(packageName)
+          }
+          const installedRoot = resolveBundleRootFromInfo(this.options.profileDir, bundle)
+          const currentLocalMembers = await readInstalledLocalMembers(
+            installedRoot,
+            checkout.aggregate.plugins,
+            workspaceDir,
+          )
+          const localPath = localPathOf(bundle.source)
+          const hasActiveOverlay = localPath !== undefined
+            && await isManagedOverlayDir(this.options.profileDir, packageName, localPath)
+          if (currentLocalMembers.size === checkout.aggregate.plugins.length && hasActiveOverlay) {
+            return await this.inspectBundle(packageName)
+          }
+        }
+
         let overlay: BuiltOverlay | undefined
         let targetSpec: string
         let targetVersion: string
-        if (checkout.aggregate) {
+        if (
+          checkout.aggregate
+          && (currentMode === 'local' || await allMembersAvailableLocally(workspaceDir, checkout.aggregate.plugins))
+        ) {
           overlay = await buildLocalOverlay({
             profileDir: this.options.profileDir,
             baseBundle: checkout,
@@ -213,41 +295,20 @@ export class LocalDevService {
           targetVersion = checkout.version
         }
 
-        const previousSpec = bundle.version && EXACT_VERSION.test(bundle.version)
-          ? `${packageName}@${bundle.version}`
-          : packageName
-        const previousEnabled = bundle.enabled
-
-        try {
-          await this.preflightLocal(packageName, targetSpec, targetVersion)
-          const restart = await this.replaceBundle({
-            packageName,
-            targetSpec,
-            targetVersion,
-            enabled: previousEnabled,
-            isRegistry: false,
-          })
-          if (overlay) {
-            await verifyOverlay(overlay.overlayDir, packageName, overlay.version, overlay.memberPaths)
-          }
-          await gcOverlays(this.options.profileDir, packageName, overlay?.overlayDir)
-          return await this.inspectBundle(packageName, restart)
-        } catch (error) {
-          await this.tryRestoreRegistry(packageName, previousSpec, previousEnabled)
-          if (overlay) {
-            const installedNow = (await this.options.manager.listBundles().catch(() => []))
-              .find(item => item.name === packageName && item.installed)
-            if (installedNow === undefined || !(await sameSpec(installedNow.source, targetSpec))) {
-              await rm(overlay.overlayDir, { recursive: true, force: true }).catch(() => {})
-            }
-          }
-          throw error instanceof LocalDevError
-            ? error
-            : new LocalDevError('switch-failed', error instanceof Error ? error.message : String(error))
-        }
+        return await this.commitLocalTransition({
+          packageName,
+          bundle,
+          targetSpec,
+          targetVersion,
+          overlay,
+        })
       }
 
       // mode === 'npm' (does not require localWorkspaceDir; retains existing overlays until replacement succeeds)
+      if (currentMode === 'npm') {
+        return await this.inspectBundle(packageName)
+      }
+
       const previousSpec = bundle.source!
       const previousVersion = bundle.version
       const previousEnabled = bundle.enabled
@@ -270,6 +331,133 @@ export class LocalDevService {
       }
     } finally {
       this.busy = false
+    }
+  }
+
+  async switchMember(packageName: string, memberName: string, mode: SourceMode): Promise<BundleLocalDevStatus> {
+    this.assertEnabled()
+    if (packageName === PACKAGE) throw new LocalDevError('protected', `${PACKAGE} cannot replace itself`)
+    if (this.busy) throw new LocalDevError('busy', 'Another local development operation is in progress')
+    this.busy = true
+    try {
+      const bundles = await this.options.manager.listBundles()
+      const bundle = bundles.find(item => item.name === packageName && item.installed)
+      if (!bundle) throw new LocalDevError('not-installed', packageName)
+      this.assertManageable(bundle)
+      if (!isLocalSource(bundle)) {
+        throw new LocalDevError('not-manageable', `${packageName} must be switched to local before switching sub-plugins`)
+      }
+
+      const workspaceDir = await validateWorkspaceDir(this.options.getWorkspaceDir())
+      const realProfileDir = await realpath(this.options.profileDir).catch(() => this.options.profileDir)
+      const checkout = await inspectSiblingCheckout(workspaceDir, packageName)
+      if (!checkout.aggregate || !checkout.aggregate.plugins.includes(memberName)) {
+        throw new LocalDevError('not-manageable', `${memberName} is not a declared direct member of ${packageName}`)
+      }
+
+      const installedRoot = resolveBundleRootFromInfo(this.options.profileDir, bundle)
+      const currentLocalMembers = await readInstalledLocalMembers(
+        installedRoot,
+        checkout.aggregate.plugins,
+        workspaceDir,
+      )
+      const nextLocalMembers = new Set(currentLocalMembers)
+      if (mode === 'local') {
+        nextLocalMembers.add(memberName)
+      } else {
+        nextLocalMembers.delete(memberName)
+      }
+
+      if (sameSet(currentLocalMembers, nextLocalMembers)) {
+        return await this.inspectBundle(packageName)
+      }
+
+      if (mode === 'npm') {
+        const bundledRoot = await resolveBundledMemberRoot(checkout.root, memberName, workspaceDir, realProfileDir)
+        if (bundledRoot === undefined) {
+          throw new LocalDevError('not-manageable', `${memberName} has no bundled npm dependency in ${checkout.root}`)
+        }
+      }
+
+      let overlay: BuiltOverlay | undefined
+      let targetSpec: string
+      let targetVersion: string
+      if (nextLocalMembers.size === 0) {
+        for (const member of checkout.aggregate.plugins) {
+          if ((await resolveBundledMemberRoot(checkout.root, member, workspaceDir, realProfileDir)) === undefined) {
+            throw new LocalDevError('not-manageable', `${member} has no bundled npm dependency in ${checkout.root}`)
+          }
+        }
+        targetSpec = `link:${checkout.root}`
+        targetVersion = checkout.version
+      } else {
+        overlay = await buildLocalOverlay({
+          profileDir: this.options.profileDir,
+          baseBundle: checkout,
+          workspaceDir,
+          localMembers: nextLocalMembers,
+        })
+        targetSpec = `link:${overlay.overlayDir}`
+        targetVersion = overlay.version
+      }
+
+      return await this.commitLocalTransition({
+        packageName,
+        bundle,
+        targetSpec,
+        targetVersion,
+        overlay,
+      })
+    } finally {
+      this.busy = false
+    }
+  }
+
+  private async commitLocalTransition(params: {
+    readonly packageName: string
+    readonly bundle: BundleInfo
+    readonly targetSpec: string
+    readonly targetVersion: string
+    readonly overlay: BuiltOverlay | undefined
+  }): Promise<BundleLocalDevStatus> {
+    const { packageName, bundle, targetSpec, targetVersion, overlay } = params
+    const wasRegistry = isRegistrySource(bundle)
+    const previousSpec = wasRegistry
+      ? (bundle.version && EXACT_VERSION.test(bundle.version) ? `${packageName}@${bundle.version}` : packageName)
+      : bundle.source!
+    const previousVersion = bundle.version
+    const previousEnabled = bundle.enabled
+
+    try {
+      await this.preflightLocal(packageName, targetSpec, targetVersion)
+      const restart = await this.replaceBundle({
+        packageName,
+        targetSpec,
+        targetVersion,
+        enabled: previousEnabled,
+        isRegistry: false,
+      })
+      if (overlay) {
+        await verifyOverlay(overlay.overlayDir, packageName, overlay.version, overlay.memberPaths)
+      }
+      await gcOverlays(this.options.profileDir, packageName, overlay?.overlayDir)
+      return await this.inspectBundle(packageName, restart)
+    } catch (error) {
+      if (wasRegistry) {
+        await this.tryRestoreRegistry(packageName, previousSpec, previousEnabled)
+      } else {
+        await this.tryRestoreLocal(packageName, previousSpec, previousVersion, previousEnabled)
+      }
+      if (overlay) {
+        const installedNow = (await this.options.manager.listBundles().catch(() => []))
+          .find(item => item.name === packageName && item.installed)
+        if (installedNow === undefined || !(await sameSpec(installedNow.source, targetSpec))) {
+          await rm(overlay.overlayDir, { recursive: true, force: true }).catch(() => {})
+        }
+      }
+      throw error instanceof LocalDevError
+        ? error
+        : new LocalDevError('switch-failed', error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -401,10 +589,14 @@ export class LocalDevService {
       unmanageableReason = 'unsupported-source'
     }
 
+    const realProfileDir = await realpath(this.options.profileDir).catch(() => this.options.profileDir)
+    const installedRoot = bundle?.installed && bundle.availability === 'profile'
+      ? resolveBundleRootFromInfo(this.options.profileDir, bundle)
+      : undefined
     let checkedInstalled: CheckedBundle | undefined
-    if (bundle?.installed && bundle.availability === 'profile') {
+    if (installedRoot !== undefined) {
       try {
-        checkedInstalled = await readCheckedBundle(resolveBundleRootFromInfo(this.options.profileDir, bundle), packageName)
+        checkedInstalled = await readCheckedBundle(installedRoot, packageName)
       } catch {
         unmanageableReason ??= 'missing-files'
       }
@@ -423,43 +615,83 @@ export class LocalDevService {
     }
 
     const mode: SourceMode = bundle !== undefined && isLocalSource(bundle) ? 'local' : 'npm'
+    const manageable = unmanageableReason === undefined
+    const localCheckoutAvailable = checkedLocal !== undefined
     const activeAggregate = checkedLocal?.aggregate ?? checkedInstalled?.aggregate
     const isAggregate = activeAggregate !== undefined
 
-    const members: MemberLocalStatus[] = []
+    const rawMembers: Array<Omit<MemberLocalStatus, 'canSwitchToLocal' | 'canSwitchToNpm'>> = []
     if (activeAggregate) {
       for (const memberName of activeAggregate.plugins) {
-        const checkoutDir = realWorkspaceDir !== undefined
+        let checkoutDir = realWorkspaceDir !== undefined
           ? join(realWorkspaceDir, packageBasename(memberName))
           : packageBasename(memberName)
-        if (realWorkspaceDir === undefined) {
-          members.push({ name: memberName, checkoutDir, available: false })
-          continue
+        let available = false
+        let version: string | undefined
+        let issue: string | undefined
+        if (realWorkspaceDir !== undefined) {
+          try {
+            const checkedMember = await inspectSiblingCheckout(realWorkspaceDir, memberName)
+            checkoutDir = checkedMember.root
+            available = true
+            version = checkedMember.version
+          } catch (error) {
+            issue = error instanceof Error ? error.message : String(error)
+          }
         }
-        try {
-          const checkedMember = await inspectSiblingCheckout(realWorkspaceDir, memberName)
-          members.push({
-            name: memberName,
-            checkoutDir: checkedMember.root,
-            available: true,
-            version: checkedMember.version,
-          })
-        } catch (error) {
-          members.push({
-            name: memberName,
-            checkoutDir,
-            available: false,
-            issue: error instanceof Error ? error.message : String(error),
-          })
+        const bundledAvailable = checkedLocal !== undefined
+          && (await resolveBundledMemberRoot(checkedLocal.root, memberName, realWorkspaceDir, realProfileDir)) !== undefined
+        let memberMode: SourceMode = 'npm'
+        if (mode === 'local' && installedRoot !== undefined) {
+          const installedMember = await resolveInstalledDependency(installedRoot, memberName)
+          if (installedMember !== undefined && await isMemberLocalPath(installedMember, realWorkspaceDir, memberName)) {
+            memberMode = 'local'
+          }
         }
+        rawMembers.push({
+          name: memberName,
+          checkoutDir,
+          available,
+          bundledAvailable,
+          mode: memberMode,
+          ...(version !== undefined ? { version } : {}),
+          ...(issue !== undefined ? { issue } : {}),
+        })
       }
     }
 
-    const localCheckoutAvailable = checkedLocal !== undefined
+    const members: MemberLocalStatus[] = rawMembers.map(member => {
+      const otherNpmHaveBundled = rawMembers.every(
+        other => other.name === member.name || other.mode === 'local' || other.bundledAvailable,
+      )
+      const otherLocalHaveCheckout = rawMembers.every(
+        other => other.name === member.name || other.mode === 'npm' || other.available,
+      )
+      return {
+        ...member,
+        canSwitchToLocal: manageable
+          && mode === 'local'
+          && localCheckoutAvailable
+          && member.mode === 'npm'
+          && member.available
+          && otherNpmHaveBundled
+          && otherLocalHaveCheckout,
+        canSwitchToNpm: manageable
+          && mode === 'local'
+          && localCheckoutAvailable
+          && member.mode === 'local'
+          && member.bundledAvailable
+          && otherNpmHaveBundled
+          && otherLocalHaveCheckout,
+      }
+    })
+
     const membersReady = isAggregate && members.length > 0 && members.every(member => member.available)
-    const manageable = unmanageableReason === undefined
     const localIsAggregate = checkedLocal?.aggregate !== undefined
-    const canSwitchToLocal = manageable && mode === 'npm' && localCheckoutAvailable && (!localIsAggregate || membersReady)
+    const hasNonLocalMembers = isAggregate && members.some(member => member.mode !== 'local')
+    const canSwitchToLocal = manageable
+      && localCheckoutAvailable
+      && (mode === 'npm' || (localIsAggregate && membersReady && hasNonLocalMembers))
     const canSwitchToNpm = manageable && mode === 'local'
 
     let activeOverlayDir: string | undefined

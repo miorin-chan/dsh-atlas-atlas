@@ -252,7 +252,15 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
                   canSwitchToLocal: false,
                   canSwitchToNpm: true,
                   localCheckoutAvailable: true,
-                  members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: true }],
+                  members: [{
+                    name: '@local/member-a',
+                    checkoutDir: '/repos/member-a',
+                    available: true,
+                    bundledAvailable: true,
+                    mode: 'npm',
+                    canSwitchToLocal: true,
+                    canSwitchToNpm: false,
+                  }],
                   membersReady: true,
                 },
               ],
@@ -261,8 +269,55 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
         },
       } as unknown as Response
     }
+    if (body.action === 'switch-member') {
+      return {
+        async json() {
+          return {
+            ok: true,
+            value: {
+              packageName: body.packageName,
+              installed: true,
+              enabled: true,
+              official: false,
+              isAggregate: true,
+              manageable: true,
+              mode: 'local',
+              currentSource: `link:/repos/${body.packageName.split('/')[1]}`,
+              canSwitchToLocal: false,
+              canSwitchToNpm: true,
+              localCheckoutAvailable: true,
+              members: [
+                {
+                  name: '@miorin/dsh-watched-sessions',
+                  checkoutDir: '/repos/dsh-watched-sessions',
+                  available: true,
+                  bundledAvailable: true,
+                  mode: body.memberName === '@miorin/dsh-watched-sessions' ? body.mode : 'local',
+                  canSwitchToLocal: body.memberName === '@miorin/dsh-watched-sessions' && body.mode === 'npm',
+                  canSwitchToNpm: body.memberName !== '@miorin/dsh-watched-sessions' || body.mode === 'local',
+                  version: '0.1.3',
+                },
+                {
+                  name: '@miorin/dsh-session-draft',
+                  checkoutDir: '/repos/dsh-session-draft',
+                  available: true,
+                  bundledAvailable: true,
+                  mode: body.memberName === '@miorin/dsh-session-draft' ? body.mode : 'npm',
+                  canSwitchToLocal: body.memberName !== '@miorin/dsh-session-draft' || body.mode === 'npm',
+                  canSwitchToNpm: body.memberName === '@miorin/dsh-session-draft' && body.mode === 'local',
+                  version: '0.1.1',
+                },
+              ],
+              membersReady: true,
+            },
+          }
+        },
+      } as unknown as Response
+    }
     return {
       async json() {
+        const isSession = body.packageName === '@miorin/dsh-atlas-session'
+        const isList = body.packageName === '@miorin/dsh-atlas-list'
         return {
           ok: true,
           value: {
@@ -270,16 +325,48 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
             installed: true,
             enabled: true,
             official: false,
-            isAggregate: body.packageName === '@miorin/dsh-atlas-list',
+            isAggregate: isList || isSession,
             manageable: true,
-            mode: 'local',
-            currentSource: `link:/repos/${body.packageName.split('/')[1]}`,
-            canSwitchToLocal: false,
-            canSwitchToNpm: true,
+            mode: isSession ? 'npm' : 'local',
+            currentSource: isSession ? '@miorin/dsh-atlas-session@0.1.0' : `link:/repos/${body.packageName.split('/')[1]}`,
+            canSwitchToLocal: true,
+            canSwitchToNpm: !isSession,
             localCheckoutAvailable: true,
-            members: body.packageName === '@miorin/dsh-atlas-list'
-              ? [{ name: '@miorin/dsh-watched-sessions', checkoutDir: '/repos/dsh-watched-sessions', available: true, version: '0.1.3' }]
-              : [],
+            members: isList
+              ? [
+                {
+                  name: '@miorin/dsh-watched-sessions',
+                  checkoutDir: '/repos/dsh-watched-sessions',
+                  available: true,
+                  bundledAvailable: true,
+                  mode: 'local',
+                  canSwitchToLocal: false,
+                  canSwitchToNpm: true,
+                  version: '0.1.3',
+                },
+                {
+                  name: '@miorin/dsh-session-draft',
+                  checkoutDir: '/repos/dsh-session-draft',
+                  available: true,
+                  bundledAvailable: true,
+                  mode: 'npm',
+                  canSwitchToLocal: true,
+                  canSwitchToNpm: false,
+                  version: '0.1.1',
+                },
+              ]
+              : isSession
+                ? [{
+                  name: '@miorin/dsh-next-actions',
+                  checkoutDir: '/repos/dsh-next-actions',
+                  available: true,
+                  bundledAvailable: true,
+                  mode: 'npm',
+                  canSwitchToLocal: false,
+                  canSwitchToNpm: false,
+                  version: '0.1.9',
+                }]
+                : [],
             membersReady: true,
           },
         }
@@ -321,6 +408,11 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
   let view
   let detailView
   let badgeView
+  let npmDetailView
+  let rowDetailView
+  let rowBadgeView
+  let npmRowDetailView
+  let unrelatedRowDetailView
   try {
     await act(async () => {
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
@@ -338,7 +430,7 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
     assert.equal(slots.has('plugins.detail.section'), false)
     assert.equal(slots.has('plugins.detail.badge'), false)
 
-    // Enable localDevEnabled -> detail slots mount, render binary source control, and badge renders a single Local Tag pill.
+    // Enable localDevEnabled -> detail slots mount, render binary + per-member controls, and partial-local Tag.
     await act(async () => {
       form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
       for (const listener of form.listeners) listener()
@@ -356,16 +448,90 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
         subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] } },
         t: (key: string) => key,
       }))
+      npmDetailView = create(createElement(DetailSection as never, {
+        subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-session', installed: true, availability: 'profile', official: false, enabled: true, rows: [] } },
+        t: (key: string) => key,
+        useRemoteAccess: () => true,
+      }))
+      rowDetailView = create(createElement(DetailSection as never, {
+        subject: {
+          kind: 'row',
+          pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
+          row: { rowId: 'watched', moduleName: '@miorin/dsh-watched-sessions', enabled: true },
+        },
+        t: (key: string) => key,
+        useRemoteAccess: () => true,
+      }))
+      rowBadgeView = create(createElement(DetailBadge as never, {
+        subject: {
+          kind: 'row',
+          pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
+          row: { rowId: 'watched', moduleName: '@miorin/dsh-watched-sessions', enabled: true },
+        },
+        t: (key: string) => key,
+      }))
+      npmRowDetailView = create(createElement(DetailSection as never, {
+        subject: {
+          kind: 'row',
+          pkg: { name: '@miorin/dsh-atlas-session', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
+          row: { rowId: 'next', moduleName: '@miorin/dsh-next-actions', enabled: true },
+        },
+        t: (key: string) => key,
+        useRemoteAccess: () => true,
+      }))
+      unrelatedRowDetailView = create(createElement(DetailSection as never, {
+        subject: {
+          kind: 'row',
+          pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
+          row: { rowId: 'other', moduleName: '@miorin/unrelated', enabled: true },
+        },
+        t: (key: string) => key,
+        useRemoteAccess: () => true,
+      }))
     })
     assert.ok(detailView.root.findByProps({ 'data-local-dev-mode': 'local' }))
-    assert.equal(detailView.root.findAllByProps({ 'data-local-dev-members': 'local' }).length, 0)
-    assert.ok(badgeView.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-atlas-list' }))
-    assert.equal(badgeView.root.findAllByProps({ 'data-tag-tone': 'info' }).length, 1)
+    assert.ok(detailView.root.findAllByProps({ className: 'dsh-atlas-local-btn' }).some(btn => btn.children.includes('switchAllToLocal')))
+    assert.ok(detailView.root.findAllByProps({ className: 'dsh-atlas-local-btn' }).some(btn => btn.children.includes('switchToNpm')))
+    const badgeTag = badgeView.root.findByProps({ 'data-tag-tone': 'info' })
+    assert.deepEqual(badgeTag.children, ['localSourceTag (1/2)'])
+
+    // Clicking a member switch button inside aggregate detail dispatches switch-member.
+    const draftRow = detailView.root.findByProps({ 'data-local-dev-member': '@miorin/dsh-session-draft' })
+    const draftBtn = draftRow.findByProps({ className: 'dsh-atlas-local-btn' })
+    await act(async () => { draftBtn.props.onClick() })
+    assert.ok(fetchRequests.some(req =>
+      req.action === 'switch-member'
+      && req.packageName === '@miorin/dsh-atlas-list'
+      && req.memberName === '@miorin/dsh-session-draft'
+      && req.mode === 'local',
+    ))
+
+    // Parent aggregate on npm hides per-member switch buttons and renders null on row subjects.
+    const npmMemberItem = npmDetailView.root.findByProps({ 'data-local-dev-member': '@miorin/dsh-next-actions' })
+    assert.equal(npmMemberItem.findAllByProps({ className: 'dsh-atlas-local-btn' }).length, 0)
+    assert.equal(npmRowDetailView.toJSON(), null)
+    assert.equal(unrelatedRowDetailView.toJSON(), null)
+
+    // Row subject on local aggregate renders badge and per-member switch control.
+    assert.ok(rowBadgeView.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-watched-sessions' }))
+    const rowFeature = rowDetailView.root.findByProps({ 'data-local-dev-member': '@miorin/dsh-watched-sessions' })
+    await act(async () => { rowFeature.findByProps({ className: 'dsh-atlas-local-btn' }).props.onClick() })
+    assert.ok(fetchRequests.some(req =>
+      req.action === 'switch-member'
+      && req.packageName === '@miorin/dsh-atlas-list'
+      && req.memberName === '@miorin/dsh-watched-sessions'
+      && req.mode === 'npm',
+    ))
   } finally {
     globalThis.fetch = originalFetch
     if (view !== undefined) act(() => view.unmount())
     if (detailView !== undefined) act(() => detailView.unmount())
     if (badgeView !== undefined) act(() => badgeView.unmount())
+    if (npmDetailView !== undefined) act(() => npmDetailView.unmount())
+    if (rowDetailView !== undefined) act(() => rowDetailView.unmount())
+    if (rowBadgeView !== undefined) act(() => rowBadgeView.unmount())
+    if (npmRowDetailView !== undefined) act(() => npmRowDetailView.unmount())
+    if (unrelatedRowDetailView !== undefined) act(() => unrelatedRowDetailView.unmount())
     for (const dispose of effects.reverse()) dispose()
   }
   assert.equal(form.listeners.size, 0)
@@ -549,7 +715,15 @@ test('expands indented aggregate settings inline under bundle title subheadings 
               canSwitchToLocal: false,
               canSwitchToNpm: false,
               localCheckoutAvailable: false,
-              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false }],
+              members: [{
+                name: '@local/member-a',
+                checkoutDir: '/repos/member-a',
+                available: false,
+                bundledAvailable: false,
+                mode: 'npm',
+                canSwitchToLocal: false,
+                canSwitchToNpm: false,
+              }],
               membersReady: false,
             },
           ],
@@ -1078,7 +1252,15 @@ test('navigates to bundle detail pages for installed official and discovered agg
               canSwitchToLocal: false,
               canSwitchToNpm: false,
               localCheckoutAvailable: false,
-              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false }],
+              members: [{
+                name: '@local/member-a',
+                checkoutDir: '/repos/member-a',
+                available: false,
+                bundledAvailable: false,
+                mode: 'npm',
+                canSwitchToLocal: false,
+                canSwitchToNpm: false,
+              }],
               membersReady: false,
             },
           ],

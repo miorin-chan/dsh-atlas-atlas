@@ -182,19 +182,45 @@ export async function buildLocalOverlay(options: {
   readonly profileDir: string
   readonly baseBundle: CheckedBundle
   readonly workspaceDir: string
+  readonly localMembers?: ReadonlySet<string>
 }): Promise<BuiltOverlay> {
-  const { baseBundle, workspaceDir } = options
+  const { baseBundle, workspaceDir, localMembers } = options
   const aggregate = baseBundle.aggregate
   if (!aggregate) {
     throw new LocalDevError('overlay-failed', `${baseBundle.name} declares no dsh.aggregate.plugins`)
   }
   const realProfileDir = await realpath(options.profileDir)
 
-  // Inspect every direct member checkout first before touching disk.
+  // Inspect every direct member source (local sibling checkout or bundled dependency) before touching disk.
   const memberBundles: CheckedBundle[] = []
   const memberPaths: Record<string, string> = {}
   for (const memberName of aggregate.plugins) {
-    const member = await inspectSiblingCheckout(workspaceDir, memberName)
+    let member: CheckedBundle
+    if (localMembers === undefined || localMembers.has(memberName)) {
+      member = await inspectSiblingCheckout(workspaceDir, memberName)
+    } else {
+      const bundledRoot = await resolveInstalledDependency(baseBundle.root, memberName)
+      if (bundledRoot === undefined) {
+        throw new LocalDevError(
+          'overlay-failed',
+          `${baseBundle.name}: bundled member "${memberName}" is not installed under ${baseBundle.root}/node_modules`,
+        )
+      }
+      if (isInside(realProfileDir, bundledRoot)) {
+        throw new LocalDevError(
+          'overlay-failed',
+          `Removing the old bundle could prune profile-owned member "${memberName}" at ${bundledRoot}`,
+        )
+      }
+      try {
+        member = await readCheckedBundle(bundledRoot, memberName)
+      } catch (error) {
+        throw new LocalDevError(
+          'overlay-failed',
+          `${baseBundle.name}: bundled member "${memberName}" is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }
     memberBundles.push(member)
     memberPaths[memberName] = member.root
   }

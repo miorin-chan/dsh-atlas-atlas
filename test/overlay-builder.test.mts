@@ -217,3 +217,79 @@ test('allocates, identifies, and garbage-collects managed overlay directories', 
   assert.equal(existsSync(overlayB), false)
   assert.equal(existsSync(join(overlayB, '..')), false)
 })
+
+test('builds selective partial-local overlay keeping non-local members linked from baseBundle node_modules', async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-overlay-partial-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+
+  const profileDir = join(root, 'profile')
+  const workspaceDir = join(root, 'workspace')
+  const baseDir = join(workspaceDir, 'dsh-atlas-demo')
+  mkdirSync(profileDir, { recursive: true })
+
+  // Local member-a with !!js tag; member-b is ONLY installed inside baseDir/node_modules/.pnpm (not cloned in workspace).
+  writePlugin(
+    join(workspaceDir, 'member-a'),
+    '@miorin/member-a',
+    `- insert:\n    - id: member-a\n      name: '@miorin/member-a'\n      config:\n        mode: !!js "process.platform"\n`,
+  )
+  const pnpmMemberB = join(baseDir, 'node_modules', '.pnpm', 'miorin+member-b@0.1.0', 'node_modules', '@miorin', 'member-b')
+  writePlugin(
+    pnpmMemberB,
+    '@miorin/member-b',
+    `- insert:\n    - id: member-b\n      name: '@miorin/member-b'\n      config:\n        bundled: true\n`,
+  )
+
+  mkdirSync(baseDir, { recursive: true })
+  writeFileSync(join(baseDir, 'index.js'), 'export const name = "@miorin/dsh-atlas-demo"; export function apply() {}\n')
+  writeFileSync(join(baseDir, 'client.js'), 'window.__ModuleLoader__.load({ id: "@miorin/dsh-atlas-demo", factory: () => ({}) });\n')
+  writeFileSync(join(baseDir, 'cordis.patch.yml'), '- insert:\n    - id: dsh-atlas-demo\n      name: "@miorin/dsh-atlas-demo"\n')
+  writeFileSync(join(baseDir, 'package.json'), `${JSON.stringify({
+    name: '@miorin/dsh-atlas-demo',
+    version: '0.1.0',
+    type: 'module',
+    exports: { '.': './index.js', './client': './client.js' },
+    dependencies: {
+      '@miorin/member-a': '0.1.0',
+      '@miorin/member-b': '0.1.0',
+    },
+    dsh: {
+      bundle: { patch: './cordis.patch.yml' },
+      client: { platform: 'web', immediately: true },
+      aggregate: { version: 1, runtimeRowId: 'dsh-atlas-demo', plugins: ['@miorin/member-a', '@miorin/member-b'] },
+    },
+  }, null, 2)}\n`)
+  mkdirSync(join(baseDir, 'node_modules', '@miorin'), { recursive: true })
+  symlinkSync(pnpmMemberB, join(baseDir, 'node_modules', '@miorin', 'member-b'), 'junction')
+
+  const baseBundle = await readCheckedBundle(baseDir, '@miorin/dsh-atlas-demo')
+  const built = await buildLocalOverlay({
+    profileDir,
+    baseBundle,
+    workspaceDir,
+    localMembers: new Set(['@miorin/member-a']),
+  })
+
+  assert.equal(await resolveInstalledDependency(built.overlayDir, '@miorin/member-a'), join(workspaceDir, 'member-a'))
+  assert.equal(await resolveInstalledDependency(built.overlayDir, '@miorin/member-b'), pnpmMemberB)
+
+  const patchDoc = parseDocument(readFileSync(join(built.overlayDir, 'cordis.patch.yml'), 'utf8'))
+  assert.deepEqual(patchDoc.errors, [])
+  const rows = (patchDoc.contents as { items: Array<{ get: (k: string, keep?: boolean) => { items: Array<{ get: (k: string) => unknown; getIn: (p: string[], keep?: boolean) => unknown }> } }> }).items[0].get('insert', true).items
+  assert.deepEqual(rows.map(r => r.get('id')), ['member-a', 'member-b', 'dsh-atlas-demo'])
+  const modeVal = rows[0].getIn(['config', 'mode'], true)
+  assert.ok(isScalar(modeVal))
+  assert.equal(modeVal.tag, 'tag:yaml.org,2002:js')
+  assert.equal(rows[1].getIn(['config', 'bundled']), true)
+
+  // Missing bundled dependency throws overlay-failed when member is excluded from localMembers.
+  await assert.rejects(
+    () => buildLocalOverlay({
+      profileDir,
+      baseBundle,
+      workspaceDir,
+      localMembers: new Set(),
+    }),
+    (err: unknown) => err instanceof LocalDevError && err.code === 'overlay-failed',
+  )
+})

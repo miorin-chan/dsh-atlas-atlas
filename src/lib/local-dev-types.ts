@@ -14,6 +14,10 @@ export interface MemberLocalStatus {
   readonly name: string
   readonly checkoutDir: string
   readonly available: boolean
+  readonly bundledAvailable: boolean
+  readonly mode: SourceMode
+  readonly canSwitchToLocal: boolean
+  readonly canSwitchToNpm: boolean
   readonly version?: string
   readonly issue?: string
 }
@@ -93,6 +97,7 @@ export type LocalDevRequest =
   | { readonly action: 'overview' }
   | { readonly action: 'inspect'; readonly packageName: string }
   | { readonly action: 'switch'; readonly packageName: string; readonly mode: SourceMode }
+  | { readonly action: 'switch-member'; readonly packageName: string; readonly memberName: string; readonly mode: SourceMode }
   | { readonly action: 'prepare-local'; readonly packageName: string }
 
 export type LocalDevResponse<T = unknown> =
@@ -115,7 +120,7 @@ export function parseLocalDevRequest(raw: unknown): LocalDevRequest {
     throw new LocalDevError('invalid-request', 'Expected JSON object')
   }
   const input = raw as Record<string, unknown>
-  const { action, packageName, mode } = input
+  const { action, packageName, memberName, mode } = input
   if (action === 'overview') return { action }
   if (!isPackageName(packageName)) {
     throw new LocalDevError('invalid-request', 'Valid packageName is required')
@@ -125,6 +130,9 @@ export function parseLocalDevRequest(raw: unknown): LocalDevRequest {
   }
   if (action === 'switch' && (mode === 'npm' || mode === 'local')) {
     return { action, packageName, mode }
+  }
+  if (action === 'switch-member' && isPackageName(memberName) && (mode === 'npm' || mode === 'local')) {
+    return { action, packageName, memberName, mode }
   }
   throw new LocalDevError('invalid-request', `Unsupported action or mode: ${JSON.stringify(action)}`)
 }

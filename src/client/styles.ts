@@ -331,11 +331,26 @@ export const CSS = `
   overflow-wrap: anywhere;
 }
 .dsh-atlas-local-members-list {
+  list-style: none;
   margin: 6px 0 0;
-  padding-left: 16px;
+  padding-left: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   color: var(--dsw-alias-label-secondary);
+}
+.dsh-atlas-local-member-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.dsh-atlas-local-member-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .dsh-atlas-expand-all,

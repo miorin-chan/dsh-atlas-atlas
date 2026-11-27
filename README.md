@@ -13,8 +13,8 @@ When you turn on a bundle, the manager reuses the existing installation (includi
 or overlay) without overwriting its source.
 By default, all seven Atlas bundles install from npm; when **Enable local repository links** is turned
 on with a saved workspace directory, turning on any uninstalled bundle installs directly
-from your local workspace (synthesizing a profile-private overlay with local sub-plugins
-for aggregate bundles) instead of falling back to npm.
+from your local workspace (synthesizing a profile-private overlay when all member checkouts exist,
+or linking `<workspace>/<basename>` directly otherwise) instead of falling back to npm.
 Disable standalone VCS Panel and Sideby Note bundles before enabling Continuity, and disable standalone visual plugins
 (or an older List Atlas that still includes Peak pricing timeline) before enabling Visual.
 Turning a bundle off keeps the installed copy and its plugin settings.
@@ -23,7 +23,7 @@ For local development, turn on **Enable local repository links**
 and save the absolute directory containing your sibling plugin checkouts (for example `/work/plugins`).
 When enabled, a **Package source** control appears in this panel and at the bottom of manageable plugin detail pages
 to switch between **npm** (latest registry release) and **Local repository** (`<workspace>/<basename>`;
-for aggregate bundles, also linking all declared `<workspace>/<member>` checkouts through a profile-private overlay
-without modifying your source tree).
+when an aggregate bundle is in local mode, you can also switch individual sub-plugins between **Local repository**
+and **npm**—or click **Switch all to local**—using profile-private overlays without modifying your source tree).
 
 [Development and verification](docs/README.md)
