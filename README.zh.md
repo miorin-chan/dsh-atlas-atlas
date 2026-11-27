@@ -13,6 +13,6 @@ DSH 在首次开启尚未安装的成员包时会从 npm 公共 registry 安装�
 启用外观前请先停用单独启用的成员插件（以及仍包含峰谷时间的旧版列表 Atlas）。
 
 需要在 npm 与本地工作区源码仓库之间切换包或单个子插件来源时，
-可在开发 profile 中安装独立插件 [模块化改良计划本地开发](../dsh-atlas-dev/README.zh.md)（`@miorin/dsh-atlas-dev`）。
+可在开发 profile 中安装独立插件 [开发模块化改良计划](../dsh-atlas-dev/README.zh.md)（`@miorin/dsh-atlas-dev`）。
 
 [开发与验证](docs/README.md)

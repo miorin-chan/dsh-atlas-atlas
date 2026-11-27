@@ -31,8 +31,8 @@
 确认时重新检查成员状态，再调用 DSH 的 `removeBundle` 从当前 profile 移除成员，保留本地目录文件。
 
 本地源码切换、聚合包 overlay 组装以及逐个子插件的 npm/本地切换能力已拆出到独立开发者插件
-[模块化改良计划本地开发](../../dsh-atlas-dev/docs/README.md)（`@miorin/dsh-atlas-dev`），
-使本管理器保持零运行时依赖，同时让 `@miorin/dsh-atlas-dev` 能够直接切换 `@miorin/dsh-atlas-atlas` 自身的安装来源。
+[开发模块化改良计划](../../dsh-atlas-dev/docs/README.md)（`@miorin/dsh-atlas-dev`），使本管理器保持零运行时依赖，
+同时让 `@miorin/dsh-atlas-dev` 能够直接切换 `@miorin/dsh-atlas-atlas` 自身的安装来源。
 
 ## 成员图标
 

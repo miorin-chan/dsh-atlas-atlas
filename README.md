@@ -16,6 +16,7 @@ Disable standalone VCS Panel and Sideby Note bundles before enabling Continuity,
 Turning a bundle off keeps the installed copy and its plugin settings.
 
 For local repository switching across `@miorin/dsh-atlas-atlas`, aggregate bundles, and individual sub-plugins,
-install [Atlas Local Dev](../dsh-atlas-dev/README.md) (`@miorin/dsh-atlas-dev`) in a developer profile.
+install [Development Modular Improvement Plan](../dsh-atlas-dev/README.md) (`@miorin/dsh-atlas-dev`)
+in a developer profile.
 
 [Development and verification](docs/README.md)
