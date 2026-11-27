@@ -71,7 +71,7 @@ function conflict(inventory: readonly BundleInfo[], target: BundleInfo, atlas: A
     if (!other.enabled || other.name === target.name) continue
     const row = other.rows.find(item => rowIds.has(item.rowId))
     if (row === undefined) continue
-    if (atlas === 'continuity' && (other.name === '@miorin/dsh-vcs-panel' || other.name === '@miorin/dsh-sideby-note')) {
+    if (atlas === 'continuity' && (other.name === '@miorin/dsh-vcs-panel' || other.name === '@miorin/dsh-sideby-note' || other.name === '@miorin/dsh-resonance')) {
       return { kind: 'continuityConflict' }
     }
     return { kind: 'conflict', bundle: other.name, row: row.rowId }

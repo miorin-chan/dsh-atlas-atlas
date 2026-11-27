@@ -14,8 +14,9 @@ The manager requires DSH `0.2.2-rc.5` or newer.
 DSH checks each member bundle's version requirements when it installs missing bundles from npm.
 When you turn on a bundle, the manager reuses the existing installation (including a local link
 or overlay) without overwriting its source.
-Disable standalone VCS Panel and Sideby Note bundles before enabling Continuity, and disable standalone visual plugins
-(or an older List Atlas that still includes Peak pricing timeline) before enabling Visual.
+Disable standalone VCS Panel, Sideby Note, or Resonance mode bundles
+before enabling Continuity, and disable standalone visual plugins (or an older List Atlas
+that still includes Peak pricing timeline) before enabling Visual.
 Turning a bundle off keeps the installed copy and its plugin settings.
 
 For local repository switching across `@miorin/dsh-atlas-atlas`, aggregate bundles, and individual sub-plugins,

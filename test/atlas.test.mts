@@ -107,7 +107,7 @@ test('reports row conflict when enabling Visual while a standalone member is ena
 
 test('keeps standalone Continuity members untouched until their bundle selections are off', async () => {
   const continuity = ATLAS_BUNDLES.continuity
-  const rows = [{ rowId: 'dsh-vcs-panel' }, { rowId: 'dsh-sideby-note' }]
+  const rows = [{ rowId: 'dsh-vcs-panel' }, { rowId: 'dsh-sideby-note' }, { rowId: 'dsh-resonance' }]
   const standalone = rows.map(row => newBundle(`@miorin/${row.rowId}`, { enabled: true, rows: [row] }))
   const { manager, profile, writes } = fixture([newBundle(continuity, { rows }), ...standalone])
   for (const member of standalone) {
