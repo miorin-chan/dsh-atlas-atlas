@@ -16,7 +16,14 @@ so `@miorin/dsh-atlas-atlas` stays free of runtime dependencies.
 
 - `README.md` is for users: installation, usage, commands, and limits.
   Provide `README.zh.md` as its Chinese version.
-- [docs/README.md](docs/README.md) records the package's behavior, build steps, and verification.
+- [DESIGN.md](DESIGN.md) is the product design entry point.
+  Read it before changing product behavior.
+  It explains the user problem, intended experience, scope, and observable success criteria.
+- Keep implementation contracts, naming rules, proposals, and verification records separate from the product design
+  in [docs/README.md](docs/README.md) (verification records say what was actually tested).
+- `CHANGELOG.md` records changes by version.
+  Keep progress, schedules, and debugging notes in task records.
+  Before closing a task, update the product design with approved decisions and link back to it.
 - [src/lib/atlas.ts](src/lib/atlas.ts) declares the official Atlas bundle names and handles npm installation,
   enablement, conflict checks, and removal.
 - [src/lib/discover-aggregates.ts](src/lib/discover-aggregates.ts) provides the zero-dependency read-only scan
