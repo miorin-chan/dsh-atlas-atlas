@@ -9,12 +9,16 @@ import * as ReactJsxRuntime from 'react/jsx-runtime'
 import { createElement, useState as reactUseState } from 'react'
 import { act, create } from 'react-test-renderer'
 
-let registration
-globalThis.window = { __ModuleLoader__: { load(entry) { registration = entry } } }
+let registration: { id: string; factory: (require: (id: string) => unknown) => { inject: string[]; apply: (ctx: unknown) => void } }
+;(globalThis as Record<string, unknown>).window = {
+  __ModuleLoader__: { load(entry: typeof registration) { registration = entry } },
+}
 await import('../client.js')
-delete globalThis.window
-assert.equal(registration.id, '@miorin/dsh-atlas-atlas')
+delete (globalThis as Record<string, unknown>).window
+assert.equal(registration!.id, '@miorin/dsh-atlas-atlas')
+
 const testRequire = createRequire(import.meta.url)
+
 function SwitchStub({
   checked,
   onChange,
@@ -38,6 +42,7 @@ function SwitchStub({
     onClick: () => { if (!disabled) onChange(!checked) },
   })
 }
+
 const testPrimitivesStub = {
   Button: ({
     icon,
@@ -55,10 +60,6 @@ const testPrimitivesStub = {
   IconChevronsUpDownOutlineMedium: (props: Record<string, unknown>) => createElement('svg', props),
   IconRightUpOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
   IconTrashOutlineRegular: (props: Record<string, unknown>) => createElement('svg', props),
-  Input: ({
-    className,
-    ...rest
-  }: Record<string, unknown>) => createElement('span', { className, 'data-primitive-input': '' }, createElement('input', rest)),
   Modal: ({
     open,
     onClose,
@@ -84,10 +85,6 @@ const testPrimitivesStub = {
     className,
   }),
   Switch: SwitchStub,
-  Tag: ({ tone, className, children }: Record<string, unknown>) => createElement('span', {
-    'data-tag-tone': tone,
-    className,
-  }, children as never),
   Tooltip: ({
     children,
     side,
@@ -110,73 +107,49 @@ const testPrimitivesStub = {
     'data-test-tooltip-label': label,
   }, children as never),
 }
-const plugin = registration.factory(id => id === '@deepseek-ai/dsh-client-ui-primitives' ? testPrimitivesStub : testRequire(id))
 
-test('mounts bundle config dynamically with local-dev detail slots gated on localDevEnabled and disposes cleanly', () => {
-  const effects = []
-  const subscriptions = new Set()
-  const slots = new Map()
-  const locales = new Map()
-  const formListeners = new Set<() => void>()
-  const form = {
-    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
-    getSnapshot() { return this.snapshot },
-    subscribe(listener: () => void) {
-      formListeners.add(listener)
-      return () => { formListeners.delete(listener) }
-    },
-  }
-  const subscribe = event => {
+const plugin = registration!.factory(id => id === '@deepseek-ai/dsh-client-ui-primitives' ? testPrimitivesStub : testRequire(id))
+
+test('mounts only plugins.bundle.config, validates 8 locales, and disposes cleanly', () => {
+  const effects: Array<() => void> = []
+  const subscriptions = new Set<string>()
+  const slots = new Map<string, { name: string; options: Record<string, unknown>; render: (p: Record<string, unknown>) => unknown }>()
+  const locales = new Map<string, Record<string, Record<string, string>>>()
+  const subscribe = (event: string) => {
     subscriptions.add(event)
     return () => subscriptions.delete(event)
   }
   const ctx = {
-    effect(install) { effects.push(install()) },
+    effect(install: () => () => void) { effects.push(install()) },
     on: subscribe,
     remote: { pluginManager: {}, $on: subscribe },
-    configForms: { get(id) { assert.equal(id, 'dsh-atlas-atlas'); return form } },
     locale: {
-      bind: () => key => key,
-      register(namespace, labels) {
+      bind: () => (key: string) => key,
+      register(namespace: string, labels: Record<string, Record<string, string>>) {
         locales.set(namespace, labels)
         return () => locales.delete(namespace)
       },
     },
     slots: {
-      inject(slot, register) {
-        assert.ok(slot === 'plugins.bundle.config' || slot === 'plugins.detail.badge' || slot === 'plugins.detail.section')
+      inject(slot: string, register: () => () => void) {
+        assert.equal(slot, 'plugins.bundle.config')
         return register()
       },
-      register(options, render) {
-        slots.set(`${options.name}:${options.key ?? options.id}`, { name: options.name, options, render })
+      register(options: Record<string, unknown>, render: (p: Record<string, unknown>) => unknown) {
+        slots.set(`${options.name}:${options.key ?? options.id}`, { name: String(options.name), options, render })
         return () => slots.delete(`${options.name}:${options.key ?? options.id}`)
       },
     },
   }
-  assert.deepEqual(plugin.inject, ['locale', 'slots', 'remote', 'remote.pluginManager', 'configForms'])
+  assert.deepEqual(plugin.inject, ['locale', 'slots', 'remote', 'remote.pluginManager'])
   plugin.apply(ctx)
 
   assert.equal(slots.get('plugins.bundle.config:@miorin/dsh-atlas-atlas')?.name, 'plugins.bundle.config')
-  assert.equal(slots.get('plugins.detail.badge:@miorin/dsh-atlas-atlas'), undefined)
-  assert.equal(slots.get('plugins.detail.section:@miorin/dsh-atlas-atlas'), undefined)
-
-  // Enabling localDevEnabled registers both detail slots; disabling disposes them.
-  form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
-  for (const listener of formListeners) listener()
-  assert.equal(slots.get('plugins.detail.badge:@miorin/dsh-atlas-atlas')?.name, 'plugins.detail.badge')
-  assert.equal(slots.get('plugins.detail.section:@miorin/dsh-atlas-atlas')?.name, 'plugins.detail.section')
-
-  form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: false } }
-  for (const listener of formListeners) listener()
-  assert.equal(slots.get('plugins.detail.badge:@miorin/dsh-atlas-atlas'), undefined)
-  assert.equal(slots.get('plugins.detail.section:@miorin/dsh-atlas-atlas'), undefined)
-
-  form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
-  for (const listener of formListeners) listener()
+  assert.equal(slots.size, 1)
   assert.deepEqual([...subscriptions].sort(), ['connection/reset', 'plugin-manager/changed'])
 
-  const labels = locales.get('dsh-atlas-atlas')
-  const listTitles = {
+  const labels = locales.get('dsh-atlas-atlas')!
+  const listTitles: Record<string, string> = {
     en: 'List Modular Improvement Plan',
     zh: '列表模块化改良计划',
     ja: 'リストのモジュール型改善計画',
@@ -186,7 +159,7 @@ test('mounts bundle config dynamically with local-dev detail slots gated on loca
     pt: 'Plano de melhoria modular das listas',
     ru: 'План модульного улучшения списков',
   }
-  const visualTitles = {
+  const visualTitles: Record<string, string> = {
     en: 'Visual Modular Improvement Plan',
     zh: '外观模块化改良计划',
     ja: '外観のモジュール型改善計画',
@@ -203,10 +176,14 @@ test('mounts bundle config dynamically with local-dev detail slots gated on loca
     assert.equal(localized.visual, visualTitles[language], language)
     const visualLocaleUrl = new URL(`../../dsh-atlas-visual/locale/${language}.json`, import.meta.url)
     if (existsSync(visualLocaleUrl)) {
-      const visualLocale = JSON.parse(readFileSync(visualLocaleUrl, 'utf8'))
+      const visualLocale = JSON.parse(readFileSync(visualLocaleUrl, 'utf8')) as { meta: { title: string } }
       assert.equal(visualLocale.meta.title, visualTitles[language], language)
     }
-    const { meta } = JSON.parse(readFileSync(new URL(`../locale/${language}.json`, import.meta.url), 'utf8'))
+    const { meta } = JSON.parse(readFileSync(new URL(`../locale/${language}.json`, import.meta.url), 'utf8')) as {
+      meta: { title: string; description: string; detail: string }
+    }
+    assert.equal(meta.detail, `docs/DETAIL.${language}.md`, language)
+    assert.equal(existsSync(new URL(`../${meta.detail}`, import.meta.url)), true, meta.detail)
     if (language === 'zh') {
       assert.equal(meta.title, '模块模块化改良计划')
       continue
@@ -223,180 +200,62 @@ test('mounts bundle config dynamically with local-dev detail slots gated on loca
   assert.equal(subscriptions.size, 0)
 })
 
-test('renders seven Atlas switches, discovered aggregates, and gates detail controls on localDevEnabled', async () => {
-  const effects = []
-  const mutations = []
-  const fetchRequests = []
+test('renders seven Atlas switches and discovered aggregates without local-dev inputs or detail slots', async () => {
+  const effects: Array<() => void> = []
+  const fetchUrls: string[] = []
   const originalFetch = globalThis.fetch
-  globalThis.fetch = async (url, init) => {
-    fetchRequests.push(JSON.parse(String(init?.body ?? '{}')))
-    const body = JSON.parse(String(init?.body ?? '{}'))
-    if (body.action === 'overview') {
-      return {
-        async json() {
-          return {
-            ok: true,
-            value: {
-              enabled: form.snapshot.value.localDevEnabled,
-              workspaceDir: form.snapshot.value.localWorkspaceDir,
-              workspaceDirValid: true,
-              aggregateBundles: [
-                {
-                  packageName: '@local/custom-bundle',
-                  installed: true,
-                  enabled: true,
-                  official: false,
-                  isAggregate: true,
-                  manageable: true,
-                  mode: 'local',
-                  canSwitchToLocal: false,
-                  canSwitchToNpm: true,
-                  localCheckoutAvailable: true,
-                  members: [{
-                    name: '@local/member-a',
-                    checkoutDir: '/repos/member-a',
-                    available: true,
-                    bundledAvailable: true,
-                    mode: 'npm',
-                    canSwitchToLocal: true,
-                    canSwitchToNpm: false,
-                  }],
-                  membersReady: true,
-                },
-              ],
-            },
-          }
-        },
-      } as unknown as Response
-    }
-    if (body.action === 'switch-member') {
-      return {
-        async json() {
-          return {
-            ok: true,
-            value: {
-              packageName: body.packageName,
-              installed: true,
-              enabled: true,
-              official: false,
-              isAggregate: true,
-              manageable: true,
-              mode: 'local',
-              currentSource: `link:/repos/${body.packageName.split('/')[1]}`,
-              canSwitchToLocal: false,
-              canSwitchToNpm: true,
-              localCheckoutAvailable: true,
-              members: [
-                {
-                  name: '@miorin/dsh-watched-sessions',
-                  checkoutDir: '/repos/dsh-watched-sessions',
-                  available: true,
-                  bundledAvailable: true,
-                  mode: body.memberName === '@miorin/dsh-watched-sessions' ? body.mode : 'local',
-                  canSwitchToLocal: body.memberName === '@miorin/dsh-watched-sessions' && body.mode === 'npm',
-                  canSwitchToNpm: body.memberName !== '@miorin/dsh-watched-sessions' || body.mode === 'local',
-                  version: '0.1.3',
-                },
-                {
-                  name: '@miorin/dsh-session-draft',
-                  checkoutDir: '/repos/dsh-session-draft',
-                  available: true,
-                  bundledAvailable: true,
-                  mode: body.memberName === '@miorin/dsh-session-draft' ? body.mode : 'npm',
-                  canSwitchToLocal: body.memberName !== '@miorin/dsh-session-draft' || body.mode === 'npm',
-                  canSwitchToNpm: body.memberName === '@miorin/dsh-session-draft' && body.mode === 'local',
-                  version: '0.1.1',
-                },
-              ],
-              membersReady: true,
-            },
-          }
-        },
-      } as unknown as Response
-    }
+  globalThis.fetch = (async (url: unknown) => {
+    fetchUrls.push(String(url))
     return {
       async json() {
-        const isSession = body.packageName === '@miorin/dsh-atlas-session'
-        const isList = body.packageName === '@miorin/dsh-atlas-list'
         return {
           ok: true,
-          value: {
-            packageName: body.packageName,
-            installed: true,
-            enabled: true,
-            official: false,
-            isAggregate: isList || isSession,
-            manageable: true,
-            mode: isSession ? 'npm' : 'local',
-            currentSource: isSession ? '@miorin/dsh-atlas-session@0.1.0' : `link:/repos/${body.packageName.split('/')[1]}`,
-            canSwitchToLocal: true,
-            canSwitchToNpm: !isSession,
-            localCheckoutAvailable: true,
-            members: isList
-              ? [
-                {
-                  name: '@miorin/dsh-watched-sessions',
-                  checkoutDir: '/repos/dsh-watched-sessions',
-                  available: true,
-                  bundledAvailable: true,
-                  mode: 'local',
-                  canSwitchToLocal: false,
-                  canSwitchToNpm: true,
-                  version: '0.1.3',
-                },
-                {
-                  name: '@miorin/dsh-session-draft',
-                  checkoutDir: '/repos/dsh-session-draft',
-                  available: true,
-                  bundledAvailable: true,
-                  mode: 'npm',
-                  canSwitchToLocal: true,
-                  canSwitchToNpm: false,
-                  version: '0.1.1',
-                },
-              ]
-              : isSession
-                ? [{
-                  name: '@miorin/dsh-next-actions',
-                  checkoutDir: '/repos/dsh-next-actions',
-                  available: true,
-                  bundledAvailable: true,
-                  mode: 'npm',
-                  canSwitchToLocal: false,
-                  canSwitchToNpm: false,
-                  version: '0.1.9',
-                }]
-                : [],
-            membersReady: true,
-          },
+          value: [
+            { packageName: '@local/custom-bundle', memberCount: 2 },
+            { packageName: '@miorin/dsh-atlas-list', memberCount: 5 },
+          ],
         }
       },
     } as unknown as Response
-  }
+  }) as unknown as typeof fetch
 
-  const form = {
-    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '/repos' } },
-    listeners: new Set<() => void>(),
-    getSnapshot() { return this.snapshot },
-    subscribe(listener: () => void) {
-      this.listeners.add(listener)
-      return () => this.listeners.delete(listener)
-    },
-    async mutate(ops: unknown[]) {
-      mutations.push(ops)
-      return true
-    },
-  }
   const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
   plugin.apply({
-    effect(install) { effects.push(install()) },
+    effect(install: () => () => void) { effects.push(install()) },
     on: () => () => {},
-    remote: { pluginManager: { async listBundles() { return { ok: true, value: [] } } }, $on: () => () => {} },
-    configForms: { get: () => form },
-    locale: { bind: () => key => key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
+    remote: {
+      pluginManager: {
+        async listBundles() {
+          return {
+            ok: true,
+            value: [
+              {
+                name: '@local/custom-bundle',
+                installed: true,
+                availability: 'profile',
+                enabled: true,
+                meta: { title: 'Custom Aggregate' },
+                rows: [
+                  { rowId: 'm1', moduleName: '@local/member-a' },
+                  { rowId: 'm2', moduleName: '@local/member-b' },
+                ],
+              },
+            ],
+          }
+        },
+      },
+      $on: () => () => {},
+    },
+    locale: {
+      bind: () => (key: string) => key,
+      resolveText: (value: unknown) => String(value),
+      register: () => () => {},
+      subscribe: () => () => {},
+      getSnapshot: () => 'en',
+    },
     slots: {
-      inject: (_, register) => register(),
-      register(options, render) {
+      inject: (_: string, register: () => () => void) => register(),
+      register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
         slots.set(options.name, render)
         return () => { slots.delete(options.name) }
       },
@@ -404,252 +263,25 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
   })
 
   const Panel = slots.get('plugins.bundle.config')!
-
-  let view
-  let detailView
-  let badgeView
-  let npmDetailView
-  let rowDetailView
-  let rowBadgeView
-  let npmRowDetailView
-  let unrelatedRowDetailView
+  let view: ReturnType<typeof create> | undefined
   try {
     await act(async () => {
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
     })
-    const bundlesList = view.root.findByProps({ 'data-atlas-panel': 'bundles' })
+    assert.deepEqual(fetchUrls, ['/api/dsh-atlas-aggregates'])
+    const bundlesList = view!.root.findByProps({ 'data-atlas-panel': 'bundles' })
     const switches = bundlesList.findAllByProps({ role: 'switch' })
     assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity', 'visual'])
-    const continuitySwitch = switches.find(item => item.props['aria-label'] === 'continuity')
-    assert.equal(continuitySwitch?.props.disabled, false)
-    const visualSwitch = switches.find(item => item.props['aria-label'] === 'visual')
-    assert.equal(visualSwitch?.props.disabled, false)
-    assert.equal(view.root.findAllByProps({ 'data-discovered-aggregates': '' }).length, 1)
+    assert.equal(switches.find(item => item.props['aria-label'] === 'continuity')?.props.disabled, false)
+    assert.equal(switches.find(item => item.props['aria-label'] === 'visual')?.props.disabled, false)
 
-    // When localDevEnabled is false, detail slots are unmounted with zero detail requests.
+    const discoveredList = view!.root.findByProps({ 'data-discovered-aggregates': '' })
+    assert.equal(discoveredList.findAll(n => n.children?.includes('Custom Aggregate')).length > 0, true)
+    assert.equal(discoveredList.findAll(n => n.children?.includes('@miorin/dsh-atlas-list')).length, 0)
+
+    assert.equal(view!.root.findAllByProps({ 'data-primitive-input': '' }).length, 0)
     assert.equal(slots.has('plugins.detail.section'), false)
     assert.equal(slots.has('plugins.detail.badge'), false)
-
-    // Enable localDevEnabled -> detail slots mount, render binary + per-member controls, and partial-local Tag.
-    await act(async () => {
-      form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
-      for (const listener of form.listeners) listener()
-    })
-    const DetailSection = slots.get('plugins.detail.section')!
-    const DetailBadge = slots.get('plugins.detail.badge')!
-    assert.ok(view.root.findByProps({ 'data-primitive-input': '' }))
-    await act(async () => {
-      detailView = create(createElement(DetailSection as never, {
-        subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] } },
-        t: (key: string) => key,
-        useRemoteAccess: () => true,
-      }))
-      badgeView = create(createElement(DetailBadge as never, {
-        subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] } },
-        t: (key: string) => key,
-      }))
-      npmDetailView = create(createElement(DetailSection as never, {
-        subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-session', installed: true, availability: 'profile', official: false, enabled: true, rows: [] } },
-        t: (key: string) => key,
-        useRemoteAccess: () => true,
-      }))
-      rowDetailView = create(createElement(DetailSection as never, {
-        subject: {
-          kind: 'row',
-          pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
-          row: { rowId: 'watched', moduleName: '@miorin/dsh-watched-sessions', enabled: true },
-        },
-        t: (key: string) => key,
-        useRemoteAccess: () => true,
-      }))
-      rowBadgeView = create(createElement(DetailBadge as never, {
-        subject: {
-          kind: 'row',
-          pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
-          row: { rowId: 'watched', moduleName: '@miorin/dsh-watched-sessions', enabled: true },
-        },
-        t: (key: string) => key,
-      }))
-      npmRowDetailView = create(createElement(DetailSection as never, {
-        subject: {
-          kind: 'row',
-          pkg: { name: '@miorin/dsh-atlas-session', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
-          row: { rowId: 'next', moduleName: '@miorin/dsh-next-actions', enabled: true },
-        },
-        t: (key: string) => key,
-        useRemoteAccess: () => true,
-      }))
-      unrelatedRowDetailView = create(createElement(DetailSection as never, {
-        subject: {
-          kind: 'row',
-          pkg: { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', official: false, enabled: true, rows: [] },
-          row: { rowId: 'other', moduleName: '@miorin/unrelated', enabled: true },
-        },
-        t: (key: string) => key,
-        useRemoteAccess: () => true,
-      }))
-    })
-    assert.ok(detailView.root.findByProps({ 'data-local-dev-mode': 'local' }))
-    assert.ok(detailView.root.findAllByProps({ className: 'dsh-atlas-local-btn' }).some(btn => btn.children.includes('switchAllToLocal')))
-    assert.ok(detailView.root.findAllByProps({ className: 'dsh-atlas-local-btn' }).some(btn => btn.children.includes('switchToNpm')))
-    const badgeTag = badgeView.root.findByProps({ 'data-tag-tone': 'info' })
-    assert.deepEqual(badgeTag.children, ['localSourceTag (1/2)'])
-
-    // Clicking a member switch button inside aggregate detail dispatches switch-member.
-    const draftRow = detailView.root.findByProps({ 'data-local-dev-member': '@miorin/dsh-session-draft' })
-    const draftBtn = draftRow.findByProps({ className: 'dsh-atlas-local-btn' })
-    await act(async () => { draftBtn.props.onClick() })
-    assert.ok(fetchRequests.some(req =>
-      req.action === 'switch-member'
-      && req.packageName === '@miorin/dsh-atlas-list'
-      && req.memberName === '@miorin/dsh-session-draft'
-      && req.mode === 'local',
-    ))
-
-    // Parent aggregate on npm hides per-member switch buttons and renders null on row subjects.
-    const npmMemberItem = npmDetailView.root.findByProps({ 'data-local-dev-member': '@miorin/dsh-next-actions' })
-    assert.equal(npmMemberItem.findAllByProps({ className: 'dsh-atlas-local-btn' }).length, 0)
-    assert.equal(npmRowDetailView.toJSON(), null)
-    assert.equal(unrelatedRowDetailView.toJSON(), null)
-
-    // Row subject on local aggregate renders badge and per-member switch control.
-    assert.ok(rowBadgeView.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-watched-sessions' }))
-    const rowFeature = rowDetailView.root.findByProps({ 'data-local-dev-member': '@miorin/dsh-watched-sessions' })
-    await act(async () => { rowFeature.findByProps({ className: 'dsh-atlas-local-btn' }).props.onClick() })
-    assert.ok(fetchRequests.some(req =>
-      req.action === 'switch-member'
-      && req.packageName === '@miorin/dsh-atlas-list'
-      && req.memberName === '@miorin/dsh-watched-sessions'
-      && req.mode === 'npm',
-    ))
-  } finally {
-    globalThis.fetch = originalFetch
-    if (view !== undefined) act(() => view.unmount())
-    if (detailView !== undefined) act(() => detailView.unmount())
-    if (badgeView !== undefined) act(() => badgeView.unmount())
-    if (npmDetailView !== undefined) act(() => npmDetailView.unmount())
-    if (rowDetailView !== undefined) act(() => rowDetailView.unmount())
-    if (rowBadgeView !== undefined) act(() => rowBadgeView.unmount())
-    if (npmRowDetailView !== undefined) act(() => npmRowDetailView.unmount())
-    if (unrelatedRowDetailView !== undefined) act(() => unrelatedRowDetailView.unmount())
-    for (const dispose of effects.reverse()) dispose()
-  }
-  assert.equal(form.listeners.size, 0)
-})
-
-test('installs uninstalled Continuity from localWorkspaceDir on toggle in local mode and requires saved workspace dir', async () => {
-  const effects = []
-  const bundles = new Map<string, Record<string, unknown>>()
-  const remoteCalls: Array<{ op: string; arg: unknown; options?: unknown }> = []
-  const originalFetch = globalThis.fetch
-  globalThis.fetch = async (_url, init) => {
-    const body = JSON.parse(String(init?.body ?? '{}')) as { action?: string; packageName?: string }
-    if (body.action === 'prepare-local') {
-      return {
-        async json() {
-          return {
-            ok: true,
-            value: {
-              spec: 'link:/repos/dsh-atlas-continuity',
-              version: '0.1.0',
-              isAggregate: true,
-              overlayDir: '/repos/dsh-atlas-continuity',
-            },
-          }
-        },
-      } as unknown as Response
-    }
-    return {
-      async json() {
-        return { ok: true, value: { enabled: true, workspaceDir: form.snapshot.value.localWorkspaceDir, workspaceDirValid: true, aggregateBundles: [] } }
-      },
-    } as unknown as Response
-  }
-
-  const form = {
-    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: true, localWorkspaceDir: '' } },
-    listeners: new Set<() => void>(),
-    getSnapshot() { return this.snapshot },
-    subscribe(listener: () => void) {
-      this.listeners.add(listener)
-      return () => this.listeners.delete(listener)
-    },
-    async mutate() { return true },
-  }
-  const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
-  plugin.apply({
-    effect(install) { effects.push(install()) },
-    on: () => () => {},
-    remote: {
-      pluginManager: {
-        async listBundles() { return { ok: true, value: [...bundles.values()] } },
-        async inspect(spec: string, options: unknown) {
-          assert.equal(arguments.length, 2)
-          assert.deepEqual(options, {})
-          remoteCalls.push({ op: 'inspect', arg: spec, options })
-          return { ok: true, value: { status: 'accepted', kind: 'path', name: '@miorin/dsh-atlas-continuity', version: '0.1.0', bundle: true } }
-        },
-        async installBundle(spec: string, options: unknown) {
-          remoteCalls.push({ op: 'installBundle', arg: spec, options })
-          bundles.set('@miorin/dsh-atlas-continuity', {
-            name: '@miorin/dsh-atlas-continuity',
-            installed: true,
-            availability: 'profile',
-            enabled: false,
-            source: spec,
-            rows: [],
-          })
-          return { ok: true, value: { application: 'applied', changed: true } }
-        },
-        async setBundleEnabled(name: string, enabled: boolean) {
-          remoteCalls.push({ op: 'setBundleEnabled', arg: name, options: enabled })
-          bundles.set(name, { ...bundles.get(name), enabled })
-          return { ok: true, value: { application: 'applied', changed: true } }
-        },
-      },
-      $on: () => () => {},
-    },
-    configForms: { get: () => form },
-    locale: { bind: () => (key: string) => key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
-    slots: {
-      inject: (_: string, register: () => () => void) => register(),
-      register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
-        slots.set(options.name, render)
-        return () => {}
-      },
-    },
-  })
-
-  const Panel = slots.get('plugins.bundle.config')!
-  let view
-  try {
-    await act(async () => {
-      view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
-    })
-    const continuityBlocked = view.root.findAllByProps({ role: 'switch', 'aria-label': 'continuity' })[0]
-    assert.equal(continuityBlocked.props.disabled, true)
-    assert.ok(view.root.findAll(node => node.type === 'p' && node.children.includes('localWorkspaceRequired')).length > 0)
-
-    await act(async () => {
-      form.snapshot = { ...form.snapshot, value: { localDevEnabled: true, localWorkspaceDir: '/repos/' } }
-      for (const listener of form.listeners) listener()
-    })
-    const continuityReady = view.root.findAllByProps({ role: 'switch', 'aria-label': 'continuity' })[0]
-    assert.equal(continuityReady.props.disabled, false)
-
-    await act(async () => {
-      continuityReady.props.onClick()
-    })
-    assert.deepEqual(remoteCalls, [
-      { op: 'inspect', arg: 'link:/repos/dsh-atlas-continuity', options: {} },
-      {
-        op: 'installBundle',
-        arg: 'link:/repos/dsh-atlas-continuity',
-        options: { enabled: false, expected: { name: '@miorin/dsh-atlas-continuity', version: '0.1.0' } },
-      },
-      { op: 'setBundleEnabled', arg: '@miorin/dsh-atlas-continuity', options: true },
-    ])
-    assert.equal(bundles.get('@miorin/dsh-atlas-continuity')?.enabled, true)
   } finally {
     globalThis.fetch = originalFetch
     if (view !== undefined) act(() => view.unmount())
@@ -695,54 +327,19 @@ test('expands indented aggregate settings inline under bundle title subheadings 
   setFactory('@local/custom-bundle', [1])
 
   const originalFetch = globalThis.fetch
-  globalThis.fetch = async () => ({
+  globalThis.fetch = (async () => ({
     async json() {
       return {
         ok: true,
-        value: {
-          enabled: false,
-          workspaceDir: '',
-          workspaceDirValid: false,
-          aggregateBundles: [
-            {
-              packageName: '@local/custom-bundle',
-              installed: true,
-              enabled: true,
-              official: false,
-              isAggregate: true,
-              manageable: true,
-              mode: 'npm',
-              canSwitchToLocal: false,
-              canSwitchToNpm: false,
-              localCheckoutAvailable: false,
-              members: [{
-                name: '@local/member-a',
-                checkoutDir: '/repos/member-a',
-                available: false,
-                bundledAvailable: false,
-                mode: 'npm',
-                canSwitchToLocal: false,
-                canSwitchToNpm: false,
-              }],
-              membersReady: false,
-            },
-          ],
-        },
+        value: [{ packageName: '@local/custom-bundle', memberCount: 1 }],
       }
     },
-  }) as unknown as Response
-
-  const form = {
-    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
-    getSnapshot() { return this.snapshot },
-    subscribe: () => () => {},
-    async mutate() { return true },
-  }
+  })) as unknown as typeof fetch
 
   const openedBundles: string[] = []
   const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
   plugin.apply({
-    effect(install) { effects.push(install()) },
+    effect(install: () => () => void) { effects.push(install()) },
     on: () => () => {},
     get(service: string) {
       if (service === 'pluginNavigation') {
@@ -785,14 +382,27 @@ test('expands indented aggregate settings inline under bundle title subheadings 
                 ],
               },
               { name: '@miorin/dsh-atlas-session', installed: true, availability: 'profile', enabled: false, removable: true, rows: [] },
+              {
+                name: '@local/custom-bundle',
+                installed: true,
+                availability: 'profile',
+                enabled: true,
+                removable: true,
+                rows: [{ rowId: 'c1', moduleName: '@local/member-a' }],
+              },
             ],
           }
         },
       },
       $on: () => () => {},
     },
-    configForms: { get: () => form },
-    locale: { bind: () => (key: string, params?: Record<string, unknown>) => params?.count !== undefined ? `${key}:${params.count}` : key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
+    locale: {
+      bind: () => (key: string, params?: Record<string, unknown>) => params?.count !== undefined ? `${key}:${params.count}` : key,
+      resolveText: (value: unknown) => String(value),
+      register: () => () => {},
+      subscribe: () => () => {},
+      getSnapshot: () => 'en',
+    },
     slots: {
       inject: (_: string, register: () => () => void) => register(),
       register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
@@ -835,7 +445,6 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     assert.ok(view!.root.findByProps({ 'data-atlas-panel': 'bundles' }))
     assert.equal(factoryCalls.length, 0)
 
-    // Enabled bundles (with or without configurable sub-plugins) show expand-only subheading toggles; disabled rows do not.
     const visualToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' })
     const workspaceToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-workspace' })
     const customToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@local/custom-bundle' })
@@ -848,11 +457,9 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-session' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
 
-    // Detail link button beside title opens that bundle's detail page; clicking title/icon only expands and never navigates.
     view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' }).props.onClick()
     assert.deepEqual(openedBundles, ['@miorin/dsh-atlas-visual'])
 
-    // Clicking Visual Atlas or Workspace Atlas subheading expands its indented list inline beneath that row without navigating.
     await act(async () => { visualToggle.props.onClick() })
     await act(async () => { workspaceToggle.props.onClick() })
     assert.equal(
@@ -868,10 +475,8 @@ test('expands indented aggregate settings inline under bundle title subheadings 
       { name: 'dsh-aggregate.config:@miorin/dsh-atlas-visual', inputProps: { view: 'page', canToggle: true } },
     ])
 
-    // Expand-all icon button above bundles expands every expandable bundle and passes expandCommand.
     const expandAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
     assert.equal(expandAllBtn.props['aria-label'], 'expandAll')
-    assert.equal(expandAllBtn.props['aria-pressed'], undefined)
     const expandAllTooltip = view!.root.findByProps({ 'data-test-tooltip-label': 'expandAll' })
     assert.equal(expandAllTooltip.props['data-test-tooltip-side'], 'right')
     assert.equal(expandAllTooltip.props['data-test-tooltip-delay'], 300)
@@ -880,31 +485,22 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     await act(async () => { expandAllBtn.props.onClick() })
     const collapseAllBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
     assert.equal(collapseAllBtn.props['aria-label'], 'collapseAll')
-    assert.equal(collapseAllBtn.props['aria-pressed'], undefined)
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }))
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }))
     assert.deepEqual(factoryCalls.slice(-1)[0]?.inputProps.expandCommand, { action: 'expand', seq: 1 })
     await act(async () => { view!.root.findByProps({ 'data-atlas-expand-all': '' }).props.onClick() })
-    const resetExpandBtn = view!.root.findByProps({ 'data-atlas-expand-all': '' })
-    assert.equal(resetExpandBtn.props['aria-label'], 'expandAll')
-    assert.equal(resetExpandBtn.props['aria-pressed'], undefined)
+    assert.equal(view!.root.findByProps({ 'data-atlas-expand-all': '' }).props['aria-label'], 'expandAll')
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-workspace' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }).length, 0)
 
-    // Re-expand Visual & Custom individually to verify individual toggles still work cleanly.
     await act(async () => { view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' }).props.onClick() })
     await act(async () => { view!.root.findByProps({ 'data-atlas-settings-toggle': '@local/custom-bundle' }).props.onClick() })
     assert.ok(view!.root.findByProps({ 'data-atlas-settings-body': '@local/custom-bundle' }))
-
-    // Clicking Visual Atlas subheading again collapses its inline settings.
-    await act(async () => {
-      view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' }).props.onClick()
-    })
+    await act(async () => { view!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-visual' }).props.onClick() })
     assert.equal(view!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-visual' }).length, 0)
 
-    // Custom factory with 0 configurable sub-plugins stays expandable via its member count badge.
     await act(async () => {
       setFactory('@local/custom-bundle', [])
       emitSlot('dsh-aggregate.member-config:@local/custom-bundle')
@@ -912,7 +508,6 @@ test('expands indented aggregate settings inline under bundle title subheadings 
     const updatedCustomToggle = view!.root.findByProps({ 'data-atlas-settings-toggle': '@local/custom-bundle' })
     assert.ok(updatedCustomToggle.findAll(n => n.children?.includes('1')).length > 0)
 
-    // Drop factories -> toggle buttons disappear while bundle rows stay intact.
     await act(async () => {
       setFactory('@miorin/dsh-atlas-visual', null)
       setFactory('@miorin/dsh-atlas-workspace', null)
@@ -928,7 +523,7 @@ test('expands indented aggregate settings inline under bundle title subheadings 
   }
 })
 
-test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and generated dsh-atlas-list', async (t) => {
+test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and generated dsh-atlas-list', async t => {
   const listClientUrl = new URL('../../dsh-atlas-list/client.js', import.meta.url)
   if (!existsSync(listClientUrl)) {
     t.skip('sibling dsh-atlas-list checkout not present')
@@ -967,12 +562,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
   })
 
   let setTargetKey: ((next: string) => void) | undefined
-  const form = {
-    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
-    getSnapshot() { return this.snapshot },
-    subscribe: () => () => {},
-    async mutate() { return true },
-  }
   const bundlesValue = [
     {
       name: '@miorin/dsh-atlas-list',
@@ -1025,15 +614,12 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     },
     $on: () => () => {},
   } as never)
-  ctx.reflect.provide('configForms', { get: () => form } as never)
 
   const disposeStatefulRoot = ctx.slots.register({
     name: 'root',
     children: {
       'plugins.bundle.config': { kind: 'keyed', scope: 'root' },
       'plugins.detail.actions': { kind: 'list', scope: 'root' },
-      'plugins.detail.badge': { kind: 'list', scope: 'root' },
-      'plugins.detail.section': { kind: 'list', scope: 'root' },
     },
   } as never, (({ renderSlot }: Record<string, unknown>) => {
     const [target, setTarget] = reactUseState('@miorin/dsh-atlas-list')
@@ -1045,7 +631,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     }, { entryKey: target }))
   }) as never)
 
-  // Register a real leaf plugin into plugins.bundle.config with locale + inject.hooks.
   const watchModeSource = { getSnapshot: () => true, subscribe: () => () => {} }
   const disposeLeaf = ctx.slots.register({
     name: 'plugins.bundle.config',
@@ -1062,7 +647,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     return createElement('div', { 'data-leaf-setting': '@miorin/dsh-watched-sessions' }, `${t('watchMode')}=${String(enabled)}`)
   }) as never)
 
-  // Load real generated plugins/dsh-atlas-list/client.js into a VM and apply to ctx.
   const listClientCode = readFileSync(listClientUrl, 'utf8')
   let listEntry: { id: string; factory: (req: (id: string) => unknown) => { apply: (c: unknown) => void } } | undefined
   vm.runInNewContext(listClientCode, {
@@ -1084,11 +668,11 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
   plugin.apply(ctx as never)
 
   const originalFetch = globalThis.fetch
-  globalThis.fetch = async () => ({
+  globalThis.fetch = (async () => ({
     async json() {
-      return { ok: true, value: { enabled: false, workspaceDir: '', workspaceDirValid: false, aggregateBundles: [] } }
+      return { ok: true, value: [] }
     },
-  }) as unknown as Response
+  })) as unknown as typeof fetch
 
   let renderer: ReturnType<typeof create> | undefined
   try {
@@ -1097,7 +681,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
       for (let i = 0; i < 6; i += 1) await Promise.resolve()
     })
 
-    // 1. Standalone aggregate detail page shows ONE single list of sub-plugins with inline expandable settings (no tabs, no second Settings list).
     assert.equal(renderer!.root.findAllByProps({ role: 'tab' }).length, 0)
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-section': 'settings' }).length, 0)
 
@@ -1108,7 +691,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     assert.equal(memberSwitches[1].props['aria-checked'], true)
     assert.equal(memberSwitches[0].props.disabled, false)
 
-    // Soft-fold raw rows style toggles cleanly.
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
     const rawToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-raw-rows-toggle': '@miorin/dsh-atlas-list' })
     assert.equal(rawToggle.props['aria-expanded'], false)
@@ -1118,7 +700,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     await act(async () => { rawToggle.props.onClick() })
     assert.equal(renderer!.root.findAllByProps({ 'data-dsh-aggregate-hide-rows': '@miorin/dsh-atlas-list' }).length, 1)
 
-    // Sub-plugin row starts collapsed; clicking its subheading expands its indented settings inline inside the row.
     const memberToggle = renderer!.root.findByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' })
     assert.equal(memberToggle.props['aria-expanded'], false)
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
@@ -1131,7 +712,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
 
-    // Sub-aggregate detail page expand-all / collapse-all expands and collapses configurable members.
     const detailExpandAll = renderer!.root.findByProps({ 'data-dsh-aggregate-expand-all': '@miorin/dsh-atlas-list' })
     await act(async () => { detailExpandAll.props.onClick() })
     assert.ok(renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }))
@@ -1140,7 +720,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
 
-    // 2. Switch to dsh-atlas-atlas panel -> ONE single list; List Atlas subheading starts collapsed and expands inline under its row.
     await act(async () => {
       setTargetKey!('@miorin/dsh-atlas-atlas')
       await Promise.resolve()
@@ -1164,11 +743,9 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     assert.equal(atlasMemberSwitches[0].props['aria-checked'], false)
     assert.equal(atlasMemberSwitches[1].props['aria-checked'], true)
 
-    // Toggling a non-configurable member switch directly inside dsh-atlas-atlas invokes setPluginEnabled.
     await act(async () => { atlasMemberSwitches[0].props.onClick() })
     assert.deepEqual(setPluginEnabledCalls, [{ entryId: 'entry-draft', enabled: true }])
 
-    // Expanding the configurable member inline inside dsh-atlas-atlas renders its settings with data-dsh-aggregate-member.
     await act(async () => {
       body.findByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' }).props.onClick()
     })
@@ -1176,13 +753,11 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     const inlineLeaf = renderer!.root.findByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' })
     assert.deepEqual(inlineLeaf.children, ['leaf-ns:watchMode=true'])
 
-    // Collapsing the inner member subheading hides only that leaf setting.
     await act(async () => {
       renderer!.root.findByProps({ 'data-dsh-aggregate-member-toggle': '@miorin/dsh-watched-sessions' }).props.onClick()
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-leaf-setting': '@miorin/dsh-watched-sessions' }).length, 0)
 
-    // Clicking master expand-all expands List Atlas AND nested configurable settings in one click.
     await act(async () => {
       renderer!.root.findByProps({ 'data-atlas-settings-toggle': '@miorin/dsh-atlas-list' }).props.onClick()
     })
@@ -1198,7 +773,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
     })
     assert.equal(renderer!.root.findAllByProps({ 'data-atlas-settings-body': '@miorin/dsh-atlas-list' }).length, 0)
 
-    // 3. Dispose leaf plugin -> toggle disappears on watched-sessions, while List Atlas remains expandable for its sub-plugin list & switches.
     await act(async () => {
       disposeLeaf()
       await Promise.resolve()
@@ -1210,7 +784,6 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
       0,
     )
 
-    // 4. Dispose aggregate bundle -> factory unregisters, inline toggle disappears cleanly while Bundles list remains.
     await act(async () => {
       await listFork.dispose()
       await Promise.resolve()
@@ -1228,63 +801,24 @@ test('end-to-end integration with real DSH SlotRegistry, createSlotRenderer, and
   }
 })
 
-test('navigates to bundle detail pages for installed official and discovered aggregates', async () => {
+test('navigates to bundle detail pages and confirms uninstall with native Modal', async () => {
   const effects: Array<() => void> = []
   const openedBundles: string[] = []
   const originalFetch = globalThis.fetch
-  globalThis.fetch = async () => ({
+  globalThis.fetch = (async () => ({
     async json() {
       return {
         ok: true,
-        value: {
-          enabled: false,
-          workspaceDir: '',
-          workspaceDirValid: false,
-          aggregateBundles: [
-            {
-              packageName: '@local/custom-bundle',
-              installed: true,
-              enabled: false,
-              official: false,
-              isAggregate: true,
-              manageable: true,
-              mode: 'npm',
-              canSwitchToLocal: false,
-              canSwitchToNpm: false,
-              localCheckoutAvailable: false,
-              members: [{
-                name: '@local/member-a',
-                checkoutDir: '/repos/member-a',
-                available: false,
-                bundledAvailable: false,
-                mode: 'npm',
-                canSwitchToLocal: false,
-                canSwitchToNpm: false,
-              }],
-              membersReady: false,
-            },
-          ],
-        },
+        value: [{ packageName: '@local/custom-bundle', memberCount: 1 }],
       }
     },
-  }) as unknown as Response
-
-  const formListeners = new Set<() => void>()
-  const form = {
-    snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: false, localWorkspaceDir: '' } },
-    getSnapshot() { return this.snapshot },
-    subscribe: (listener: () => void) => {
-      formListeners.add(listener)
-      return () => { formListeners.delete(listener) }
-    },
-    async mutate() { return true },
-  }
+  })) as unknown as typeof fetch
 
   let hasNavigation = true
   const removedBundles: string[] = []
   const slots = new Map<string, (props: Record<string, unknown>) => unknown>()
   plugin.apply({
-    effect(install) { effects.push(install()) },
+    effect(install: () => () => void) { effects.push(install()) },
     on: () => () => {},
     get(service: string) {
       if (service === 'pluginNavigation' && hasNavigation) {
@@ -1303,6 +837,7 @@ test('navigates to bundle detail pages for installed official and discovered agg
             value: [
               { name: '@miorin/dsh-atlas-visual', installed: true, availability: 'profile', enabled: true, removable: true, rows: [] },
               { name: '@miorin/dsh-atlas-list', installed: true, availability: 'profile', enabled: false, removable: true, rows: [] },
+              { name: '@local/custom-bundle', installed: true, availability: 'profile', enabled: false, removable: true, rows: [] },
             ],
           }
         },
@@ -1313,8 +848,13 @@ test('navigates to bundle detail pages for installed official and discovered agg
       },
       $on: () => () => {},
     },
-    configForms: { get: () => form },
-    locale: { bind: () => (key: string) => key, register: () => () => {}, subscribe: () => () => {}, getSnapshot: () => 'en' },
+    locale: {
+      bind: () => (key: string) => key,
+      resolveText: (value: unknown) => String(value),
+      register: () => () => {},
+      subscribe: () => () => {},
+      getSnapshot: () => 'en',
+    },
     slots: {
       inject: (_: string, register: () => () => void) => register(),
       register(options: { name: string }, render: (props: Record<string, unknown>) => unknown) {
@@ -1331,7 +871,6 @@ test('navigates to bundle detail pages for installed official and discovered agg
       view = create(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
     })
 
-    // Only the trailing jump arrow navigates to bundle details; titles and icons never navigate.
     const visualOpen = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-visual' })
     const listOpen = view!.root.findByProps({ 'data-atlas-open': '@miorin/dsh-atlas-list' })
     const customOpen = view!.root.findByProps({ 'data-atlas-open': '@local/custom-bundle' })
@@ -1342,7 +881,6 @@ test('navigates to bundle detail pages for installed official and discovered agg
     assert.equal(view!.root.findAllByProps({ 'data-atlas-open': '@miorin/dsh-atlas-workspace' }).length, 0)
     assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
 
-    // Verify scoped/modernized CSS and native Modal uninstall confirmation.
     const panelStyleText = String(view!.root.findByType('style').children[0] ?? '')
     assert.doesNotMatch(panelStyleText, /--dsw-alias-brand-primary/)
     assert.match(panelStyleText, /@media \(hover: hover\)[\s\S]*\.dsh-atlas-manager-danger:hover:not\(:disabled\)/)
@@ -1366,7 +904,6 @@ test('navigates to bundle detail pages for installed official and discovered agg
       '@local/custom-bundle',
     ])
 
-    // When pluginNavigation is absent, trailing jump arrows disappear cleanly.
     hasNavigation = false
     await act(async () => {
       view!.update(createElement(Panel as never, { view: 'page', useRemoteAccess: () => true }))
@@ -1374,49 +911,11 @@ test('navigates to bundle detail pages for installed official and discovered agg
     assert.equal(view!.root.findAll(node => typeof node.props['data-atlas-open'] === 'string').length, 0)
     assert.equal(view!.root.findAllByProps({ className: 'dsh-atlas-manager-icon dsh-atlas-manager-icon-btn' }).length, 0)
 
-    assert.equal(slots.get('plugins.detail.badge'), undefined)
-    form.snapshot = { ...form.snapshot, value: { localDevEnabled: true, localWorkspaceDir: '/tmp/ws' } }
-    for (const listener of formListeners) listener()
-    const BadgeSlot = slots.get('plugins.detail.badge')!
-    const badgeFetch = (async () => new Response(JSON.stringify({
-      ok: true,
-      value: {
-        packageName: '@miorin/dsh-atlas-visual',
-        installed: true,
-        enabled: true,
-        official: false,
-        isAggregate: true,
-        manageable: true,
-        mode: 'local',
-        currentSource: 'link:/tmp/ws/dsh-atlas-visual',
-        canSwitchToLocal: false,
-        canSwitchToNpm: true,
-        localCheckoutAvailable: true,
-        localCheckoutDir: '/tmp/ws/dsh-atlas-visual',
-        members: [],
-        membersReady: false,
-      },
-    }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch
-    globalThis.fetch = badgeFetch
-    let badgeView: ReturnType<typeof create> | undefined
-    try {
-      await act(async () => {
-        badgeView = create(createElement(BadgeSlot as never, {
-          subject: { kind: 'bundle', pkg: { name: '@miorin/dsh-atlas-visual', installed: true } },
-          t: (key: string) => key,
-        }))
-        await Promise.resolve()
-      })
-      assert.equal(badgeView!.root.findAllByType('style').length, 1, 'LocalDevBadge mounts styles independently')
-      assert.ok(badgeView!.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-atlas-visual' }))
-      assert.equal(badgeView!.root.findAllByProps({ 'data-tag-tone': 'info' }).length, 1)
-    } finally {
-      if (badgeView !== undefined) act(() => badgeView.unmount())
-    }
-
     const pkgJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      dependencies?: Record<string, string>
       scripts?: Record<string, string>
     }
+    assert.equal(pkgJson.dependencies, undefined)
     assert.equal(pkgJson.scripts?.prepack, 'npm run build 1>&2')
     assert.match(pkgJson.scripts?.['sync:atlas-icons'] ?? '', /scripts\/build\.mjs/)
   } finally {

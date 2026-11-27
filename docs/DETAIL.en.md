@@ -1,2 +1,2 @@
-Install available bundles from npm or link local repositories.
+Install published bundles from npm or reuse existing local installations.
 Turning a bundle off keeps it installed.

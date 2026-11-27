@@ -7,26 +7,23 @@ Where the two conflict, this file wins.
 
 ## Scope
 
-This bundle provides one behavior.
-Check whether new behavior belongs in its own bundle.
+This bundle provides the lightweight user-facing Atlas manager card.
+Local repository linking, overlay synthesis, and detail-page source switching live
+in the separate developer plugin `@miorin/dsh-atlas-dev` (`plugins/dsh-atlas-dev`)
+so `@miorin/dsh-atlas-atlas` stays free of runtime dependencies.
 
 ## Project documentation
 
 - `README.md` is for users: installation, usage, commands, and limits.
   Provide `README.zh.md` as its Chinese version.
 - [docs/README.md](docs/README.md) records the package's behavior, build steps, and verification.
-- [src/lib/atlas.ts](src/lib/atlas.ts) declares the official Atlas bundle names and handles bundle enablement
-  and removal.
-- [src/lib/local-dev-service.ts](src/lib/local-dev-service.ts)
-  and [src/lib/overlay-builder.ts](src/lib/overlay-builder.ts) implement stateless local/npm source switching
-  (direct link for single bundles, and parent-gated per-member local/npm overlay assembly
-  for local aggregate bundles) under `<profileDir>/dsh-atlas-local-dev/overlays/`.
+- [src/lib/atlas.ts](src/lib/atlas.ts) declares the official Atlas bundle names and handles npm installation,
+  enablement, conflict checks, and removal.
+- [src/lib/discover-aggregates.ts](src/lib/discover-aggregates.ts) provides the zero-dependency read-only scan
+  for installed `dsh.aggregate` bundles.
 - Keep the plugin detail page short.
   Set `meta.title` and `meta.description` in `locale/*.json` for the DSH interface language.
-  Use `meta.detail` in each locale to select a short, packaged Markdown document when needed.
-  Link to the guide with an absolute HTTPS URL and put usage entry points, compatibility, and installation steps there.
-  Add one localized preview when it helps explain the feature.
-  Use DSH's detail page slots for interactive controls.
+  Use `meta.detail` in each locale (`docs/DETAIL.<lang>.md`) to select a short, packaged Markdown document when needed.
 
 ## Language
 
@@ -45,7 +42,7 @@ Node.js 22.18 or newer runs the `.test.mts` files directly.
 - Use TypeScript for plugin source unless otherwise specified.
   Use the workspace base for TypeScript plugins.
   Put Host, Client, and private module sources under `src/host/`, `src/client/`, and `src/lib/` as needed.
-  The build generates `index.js`, `client.js`, and the `lib/atlas.js` test module.
+  The build generates `index.js`, `client.js`, and the `lib/*.js` test/runtime modules.
   Git ignores these outputs.
 - Keep Plugin Manager metadata in `locale/*.json` and runtime translations in `LABELS` in the Client source.
 - The client test uses a fake `ctx` to check registration, resources, and cleanup.
@@ -55,53 +52,24 @@ Node.js 22.18 or newer runs the `.test.mts` files directly.
 
 - Prefer native DSH components, behavior, theme tokens, and layouts from comparable screens
   to reduce code and maintenance.
-- Prefer runtime reuse through supported slots, component factories,
-  or host-provided modules when performance is acceptable.
-  Let the host supply the implementation and write only the code needed to fill gaps in existing components
-  and extension points.
+- Prefer runtime reuse through supported slots, component factories, or host-provided modules
+  when performance is acceptable.
 - When statically importing or bundling official code or assets, annotate the reference
   with the upstream package, version or commit, source path, and symbol name.
   Keep applicable licenses and attribution so future updates can be traced to the source.
 
 ## Implementation
 
-- Keep the bundle independently installable and toggleable.
-  Keep runtime modules private to this bundle and put shared tools in the workspace `tools/` directory.
+- Keep the bundle independently installable and toggleable, with zero runtime `dependencies`.
 - Implement the feature through supported DSH plugin APIs and extension points.
   Keep DSH source and installed files intact.
-  Do not patch global behavior or override DSH internals.
-  If the available extension points are insufficient, report the limitation and keep the implementation
-  within the supported scope.
 - Reuse the DSH type declarations for the supported runtime version.
   Preserve types across plugin interfaces, configuration, and events.
-  Validate and narrow unknown inputs, and keep the type dependencies in sync.
 - Keep the factory free of side effects.
   Register resources in `apply` with `ctx.effect` or `ctx.on` and return cleanup functions.
-- Prefer recognizable icons for common action buttons, and use visible text only
-  when an icon alone would leave the action unclear.
-- Replace the placeholder icon with original artwork and update the title and description
-  in all eight locale files before release.
-- Resolve every scaffold placeholder before release.
-
-## Versioning
-
-Major version upgrades are the user's decision; regular iterations stay on the current major version.
-Update `CHANGELOG.md` when releasing.
+- Always pass `PREK_HOME="${TMPDIR:?}/prek-dsh"` when committing inside the sandbox.
 
 ## Verification
 
 - Follow the [development checks](docs/README.md#本地安装与开发检查).
-- From the workspace root, run `node tools/new-dsh-plugin/cli.mts --check plugins/<id>` to check the manifest,
-  locale JSON, and the other scaffold files.
-- Use a disposable profile for installation tests.
-  Distinguish fixture results from observations in the UI.
-- After a DSH upgrade, run the tests and verify the behavior in the running UI.
-  Record what to verify.
-
-## Markdown
-
-- Run `docs/scripts/reflow md <path>` to format edited Markdown.
-- Run `prek install` once per checkout to format staged Markdown at commit time.
-  Keep the generated `AGENTS.md` byte-for-byte identical to the shared template.
-- When committing in the DSH sandbox, use `PREK_HOME="${TMPDIR:?}/prek-dsh" git commit -m "<commit message>"`
-  to run the reflow hook with a writable cache and log directory.
+- From the workspace root, run `node tools/new-dsh-plugin/cli.mts --check plugins/<id>`.

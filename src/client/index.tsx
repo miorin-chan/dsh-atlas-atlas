@@ -3,23 +3,20 @@ import type {} from '@deepseek-ai/dsh-api-remote-access/client'
 import type { BundleInfo, ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import type { PluginConfigViewProps, PluginDetailProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import {
   Button,
   IconChevronRightOutlineRegular,
   IconChevronsUpDownOutlineMedium,
   IconRightUpOutlineRegular,
   IconTrashOutlineRegular,
-  Input,
   Modal,
   StateDot,
   Switch,
-  Tag,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { PropsLocale, PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderFactories, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type {} from '@deepseek-ai/dsh-plugin-manager/types'
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
@@ -28,54 +25,71 @@ import {
   useAggregateSettingsMap,
 } from './aggregate-settings.js'
 import {
+  AGGREGATES_ROUTE,
   ATLAS_BUNDLES,
   canUninstallAtlas,
-  ENTRY_ID,
-  normalizeWorkspaceDir,
   PACKAGE,
   setAtlasEnabled,
   uninstallAtlas,
   type Atlas,
+  type DiscoveredAggregate,
   type Notice,
   type Progress,
 } from '../lib/atlas.js'
-import type {
-  BundleLocalDevStatus,
-  LocalDevConfig,
-  LocalDevErrorCode,
-  LocalDevOverview,
-  LocalDevRequest,
-} from '../lib/local-dev-types.js'
-import { LABELS, localDevErrorKey, type AtlasLabelKey } from './labels.js'
-import { fetchLocalDevOverview, prepareBundleLocalDev, requestLocalDev } from './local-dev-api.js'
-import { LocalDevBadge, LocalDevDetailSection, localTagText, MemberLocalDevList } from './local-dev-detail.js'
+import { LABELS, type AtlasLabelKey } from './labels.js'
 import { ATLAS_ICONS } from './published-icons.js'
 import { CSS } from './styles.js'
 
 const NS = 'dsh-atlas-atlas'
 const CONFIG_SLOT = 'plugins.bundle.config'
-const DETAIL_BADGE_SLOT = 'plugins.detail.badge'
-const DETAIL_SECTION_SLOT = 'plugins.detail.section'
 const ATLASES = Object.keys(ATLAS_BUNDLES) as Atlas[]
 const OFFICIAL_ATLAS_SET = new Set<string>(Object.values(ATLAS_BUNDLES))
-export const inject = ['locale', 'slots', 'remote', 'remote.pluginManager', 'configForms']
+export const inject = ['locale', 'slots', 'remote', 'remote.pluginManager']
 
 type ClientContext = Pick<Context, 'effect' | 'on'> & Partial<Pick<Context, 'get'>> & {
   locale: LocaleRuntime
   slots: SlotRegistry
   remote: ClientRemote
-  configForms: Context['configForms']
 }
 type PanelProps = PluginConfigViewProps
   & Pick<PropsRuntime<typeof CONFIG_SLOT>, 'useRemoteAccess'>
   & Partial<PropsRenderFactories>
-type DetailBadgeSlotProps = PluginDetailProps
-type DetailSectionSlotProps = PluginDetailProps & Pick<PropsRuntime<typeof DETAIL_SECTION_SLOT>, 'useRemoteAccess'>
 type Inventory = readonly BundleInfo[] | 'failed' | undefined
 interface Snapshot {
   readonly inventory: Inventory
+  readonly discovered: readonly DiscoveredAggregate[]
   readonly activity?: { atlas: Atlas; stage: Progress }
   readonly notices: Partial<Record<Atlas, { enabled: boolean; notice: Notice }>>
+}
+
+type TransportFetch = (input: string, init?: RequestInit) => Promise<Response>
+
+function resolveFetch(): TransportFetch | undefined {
+  const hostWindow = globalThis as { __DSH_TRANSPORT__?: { fetch?: TransportFetch }; fetch?: TransportFetch }
+  if (typeof hostWindow.__DSH_TRANSPORT__?.fetch === 'function') return hostWindow.__DSH_TRANSPORT__.fetch
+  if (typeof hostWindow.fetch === 'function') return hostWindow.fetch.bind(globalThis)
+  return undefined
+}
+
+async function fetchDiscoveredAggregates(signal?: AbortSignal): Promise<readonly DiscoveredAggregate[]> {
+  const fetchImpl = resolveFetch()
+  if (fetchImpl === undefined) return []
+  try {
+    const response = await fetchImpl(AGGREGATES_ROUTE, {
+      method: 'GET',
+      ...(signal !== undefined ? { signal } : {}),
+    })
+    const payload = await response.json() as { ok?: boolean; value?: unknown }
+    if (!payload?.ok || !Array.isArray(payload.value)) return []
+    return payload.value.filter(
+      (item): item is DiscoveredAggregate => item !== null
+        && typeof item === 'object'
+        && typeof (item as DiscoveredAggregate).packageName === 'string'
+        && typeof (item as DiscoveredAggregate).memberCount === 'number',
+    )
+  } catch {
+    return []
+  }
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -84,30 +98,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-function isAbsoluteDirInput(path: string): boolean {
-  return normalizeWorkspaceDir(path) !== undefined
-}
-
 export function apply(ctx: ClientContext): void {
   const manager = ctx.remote.pluginManager
-  const localDevForm = ctx.configForms.get<LocalDevConfig>(ENTRY_ID)
-  const subscribeForm = (listener: () => void) => localDevForm.subscribe(listener)
-  const formSnapshot = () => localDevForm.getSnapshot()
   const listeners = new Set<() => void>()
-  const localDevListeners = new Set<() => void>()
-  let snapshot: Snapshot = { inventory: undefined, notices: {} }
+  let snapshot: Snapshot = { inventory: undefined, discovered: [], notices: {} }
   let refreshId = 0
   let observing = false
   let disposed = false
-
-  function emitLocalDevUpdate(): void {
-    for (const listener of localDevListeners) listener()
-  }
-
-  function subscribeLocalDevUpdate(listener: () => void): () => void {
-    localDevListeners.add(listener)
-    return () => { localDevListeners.delete(listener) }
-  }
 
   function update(change: Partial<Snapshot>): void {
     if (disposed) return
@@ -123,9 +120,14 @@ export function apply(ctx: ClientContext): void {
   async function refresh(): Promise<void> {
     const id = ++refreshId
     let inventory: Inventory = 'failed'
+    let discovered: readonly DiscoveredAggregate[] = []
     try {
-      const result = await manager.listBundles()
-      if (result.ok) inventory = result.value
+      const [bundleResult, discoveredList] = await Promise.all([
+        manager.listBundles(),
+        fetchDiscoveredAggregates(),
+      ])
+      if (bundleResult.ok) inventory = bundleResult.value
+      discovered = discoveredList
     } catch {
       // A failed or disconnected read is retried on request or reconnection.
     }
@@ -144,8 +146,7 @@ export function apply(ctx: ClientContext): void {
         }
       }
     }
-    update({ inventory, notices })
-    emitLocalDevUpdate()
+    update({ inventory, discovered, notices })
   }
 
   async function toggle(atlas: Atlas, enabled: boolean): Promise<void> {
@@ -153,17 +154,7 @@ export function apply(ctx: ClientContext): void {
     const progress = (stage: Progress) => update({ activity: { atlas, stage } })
     progress(enabled ? 'enabling' : 'disabling')
     update({ notices: { ...snapshot.notices, [atlas]: undefined } })
-    const cfg = localDevForm.getSnapshot().value
-    const notice = await setAtlasEnabled(manager, atlas, enabled, progress, {
-      localDevEnabled: cfg?.localDevEnabled === true,
-      localWorkspaceDir: cfg?.localWorkspaceDir,
-      prepareLocal: async packageName => {
-        const response = await prepareBundleLocalDev(packageName)
-        return response.ok
-          ? { ok: true, spec: response.value.spec, version: response.value.version }
-          : { ok: false, detail: response.detail ?? t(localDevErrorKey(response.error)) }
-      },
-    })
+    const notice = await setAtlasEnabled(manager, atlas, enabled, progress)
     update({ notices: { ...snapshot.notices, [atlas]: notice && { enabled, notice } } })
     await refresh()
     update({ activity: undefined })
@@ -185,75 +176,12 @@ export function apply(ctx: ClientContext): void {
 
   function NoticeLine({ notice }: { notice: Notice }) {
     const { kind } = notice
-    const error = kind.endsWith('Failed') || kind === 'bundleMissing' || kind === 'localWorkspaceRequired'
+    const error = kind.endsWith('Failed') || kind === 'bundleMissing'
       || kind === 'conflict' || kind === 'continuityConflict' || kind === 'uninstallUnavailable'
     const message = notice.kind === 'conflict'
       ? t('conflict', { bundle: notice.bundle, row: notice.row })
       : t(kind)
     return <p className="dsh-atlas-manager-status" data-atlas-status={kind} data-error={error ? '' : undefined}>{message}</p>
-  }
-
-  function LocalDevControls({
-    status,
-    busy,
-    canSwitch,
-    onAction,
-  }: {
-    status: BundleLocalDevStatus
-    busy: boolean
-    canSwitch: boolean
-    onAction: (request: LocalDevRequest) => void
-  }) {
-    if (!status.installed) return null
-    return (
-      <>
-        <div className="dsh-atlas-local-actions">
-          {status.mode === 'npm' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="dsh-atlas-local-btn"
-              disabled={busy || !canSwitch || !status.canSwitchToLocal}
-              onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'local' })}
-            >
-              {t('switchToLocal')}
-            </Button>
-          ) : (
-            <>
-              {status.canSwitchToLocal && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="dsh-atlas-local-btn"
-                  disabled={busy || !canSwitch}
-                  onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'local' })}
-                >
-                  {t('switchAllToLocal')}
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="dsh-atlas-local-btn"
-                disabled={busy || !canSwitch || !status.canSwitchToNpm}
-                onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'npm' })}
-              >
-                {t('switchToNpm')}
-              </Button>
-            </>
-          )}
-        </div>
-        {status.isAggregate && status.mode === 'local' && status.members.length > 0 && (
-          <MemberLocalDevList
-            status={status}
-            busy={busy}
-            canSwitch={canSwitch}
-            t={t}
-            onAction={onAction}
-          />
-        )}
-      </>
-    )
   }
 
   function BundleRowIcon({
@@ -322,29 +250,19 @@ export function apply(ctx: ClientContext): void {
     const canToggle = useRemoteAccess('pluginManager/setBundleEnabled')
     const canToggleMembers = useRemoteAccess('pluginManager/setPluginEnabled')
     const canInstall = useRemoteAccess('pluginManager/installBundle')
-    const canInspect = useRemoteAccess('pluginManager/inspect')
     const canRemove = useRemoteAccess('pluginManager/removeBundle')
-    const settings = useSyncExternalStore(subscribeForm, formSnapshot, formSnapshot)
-    const [draft, setDraft] = useState<string>()
     const [uninstallTarget, setUninstallTarget] = useState<Atlas>()
     const memberStatus = useRef<Partial<Record<Atlas, HTMLDivElement | null>>>({})
-    const [saving, setSaving] = useState(false)
-    const [saveFailed, setSaveFailed] = useState(false)
-    const [overview, setOverview] = useState<LocalDevOverview>()
-    const [localDevBusy, setLocalDevBusy] = useState(false)
-    const [localDevError, setLocalDevError] = useState<{ packageName: string; code: LocalDevErrorCode; detail?: string }>()
     const [expandedBundles, setExpandedBundles] = useState<Readonly<Record<string, true>>>({})
     const [expandCommand, setExpandCommand] = useState<{ readonly action: 'expand' | 'collapse'; readonly seq: number }>()
-    const { inventory, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
+    const { inventory, discovered, activity, notices } = useSyncExternalStore(subscribe, () => snapshot)
     useSyncExternalStore(subscribeLocale, localeSnapshot)
     const listId = useId()
 
-    const localDevEnabled = settings.value?.localDevEnabled === true
-    const workspaceDir = draft ?? settings.value?.localWorkspaceDir ?? ''
-    const discoveredAggregates = (overview?.aggregateBundles ?? []).filter(item => !OFFICIAL_ATLAS_SET.has(item.packageName))
+    const otherAggregates = discovered.filter(item => !OFFICIAL_ATLAS_SET.has(item.packageName))
     const trackedPackages = [
       ...Object.values(ATLAS_BUNDLES),
-      ...discoveredAggregates.map(item => item.packageName),
+      ...otherAggregates.map(item => item.packageName),
     ]
     const settingsByPackage = useAggregateSettingsMap(ctx.slots, trackedPackages)
     const canNavigate = typeof getPluginNavigation()?.openBundle === 'function'
@@ -355,21 +273,6 @@ export function apply(ctx: ClientContext): void {
       void refresh()
       return () => { observing = false }
     }, [canList])
-
-    useEffect(() => {
-      if (!canList) return
-      let cancelled = false
-      const loadOverview = async () => {
-        const res = await fetchLocalDevOverview()
-        if (!cancelled && res.ok) setOverview(res.value)
-      }
-      void loadOverview()
-      const off = subscribeLocalDevUpdate(() => { void loadOverview() })
-      return () => {
-        cancelled = true
-        off()
-      }
-    }, [canList, localDevEnabled, settings.value?.localWorkspaceDir])
 
     if (!canList) return <p className="dsh-atlas-manager-status">{t('readDenied')}</p>
     if (inventory === undefined) return <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
@@ -391,73 +294,15 @@ export function apply(ctx: ClientContext): void {
       </div>
     )
 
-    const busy = saving || localDevBusy || activity !== undefined
-    const canEdit = settings.status === 'ready' && settings.writable
-    const canSwitchLocal = canInstall && canRemove
-    const savedWorkspaceDir = normalizeWorkspaceDir(settings.value?.localWorkspaceDir)
-    const pathValid = workspaceDir.trim() === '' || isAbsoluteDirInput(workspaceDir)
-    const pathDirty = settings.status === 'ready' && workspaceDir.trim() !== (settings.value?.localWorkspaceDir ?? '')
-    const pathId = `${listId}-workspace-dir`
+    const busy = activity !== undefined
+    const discoveredRows = otherAggregates
+      .map(item => ({
+        discovered: item,
+        bundle: inventory.find(bundle => bundle.name === item.packageName),
+      }))
+      .filter((entry): entry is { discovered: DiscoveredAggregate; bundle: BundleInfo } =>
+        entry.bundle !== undefined && entry.bundle.installed)
 
-    async function toggleLocalDev(next: boolean) {
-      if (busy || !canEdit) return
-      setSaving(true)
-      setSaveFailed(false)
-      try {
-        const saved = await localDevForm.mutate([
-          { op: 'set', path: ['localDevEnabled'], value: next },
-        ], settings.revision)
-        if (!saved) {
-          setSaveFailed(true)
-          return
-        }
-        emitLocalDevUpdate()
-      } catch {
-        setSaveFailed(true)
-      } finally {
-        setSaving(false)
-      }
-    }
-
-    async function saveWorkspaceDir() {
-      const trimmed = workspaceDir.trim()
-      if (busy || !canEdit || (trimmed !== '' && !isAbsoluteDirInput(trimmed))) return
-      setSaving(true)
-      setSaveFailed(false)
-      try {
-        const saved = await localDevForm.mutate([
-          { op: 'set', path: ['localWorkspaceDir'], value: trimmed },
-        ], settings.revision)
-        if (!saved) {
-          setSaveFailed(true)
-          return
-        }
-        setDraft(undefined)
-        emitLocalDevUpdate()
-      } catch {
-        setSaveFailed(true)
-      } finally {
-        setSaving(false)
-      }
-    }
-
-    async function runLocalDevAction(request: LocalDevRequest) {
-      if (busy || !canSwitchLocal) return
-      setLocalDevBusy(true)
-      setLocalDevError(undefined)
-      try {
-        const res = await requestLocalDev<BundleLocalDevStatus>(request)
-        if (!res.ok) {
-          const pkgName = 'packageName' in request ? request.packageName : PACKAGE
-          setLocalDevError({ packageName: pkgName, code: res.error, detail: res.detail })
-        }
-        await refresh()
-      } finally {
-        setLocalDevBusy(false)
-      }
-    }
-
-    const statusByPackage = new Map((overview?.aggregateBundles ?? []).map(item => [item.packageName, item]))
     const openBundle = (packageName: string) => { getPluginNavigation()?.openBundle(packageName) }
     const expandablePackages = typeof renderFactorySlot === 'function'
       ? [
@@ -466,8 +311,8 @@ export function apply(ctx: ClientContext): void {
           const bundle = inventory.find(item => item.name === packageName)
           return bundle?.enabled === true && settingsByPackage.has(packageName) ? packageName : undefined
         }),
-        ...discoveredAggregates.map(item =>
-          item.enabled && settingsByPackage.has(item.packageName) ? item.packageName : undefined,
+        ...discoveredRows.map(item =>
+          item.bundle.enabled && settingsByPackage.has(item.bundle.name) ? item.bundle.name : undefined,
         ),
       ].filter((pkg): pkg is string => pkg !== undefined)
       : []
@@ -550,56 +395,6 @@ export function apply(ctx: ClientContext): void {
 
     return (
       <div data-atlas-manager="">
-        <section className="dsh-atlas-manager-repositories" aria-busy={saving || localDevBusy}>
-          <div className="dsh-atlas-manager-repository-row">
-            <span className="dsh-atlas-manager-label" id={`${pathId}-mode`}>{t('localDevToggle')}</span>
-            <Switch
-              checked={localDevEnabled}
-              label={t('localDevToggle')}
-              disabled={!canEdit || busy}
-              onChange={next => { void toggleLocalDev(next) }}
-            />
-          </div>
-          <p id={`${pathId}-mode-help`} className="dsh-atlas-manager-status">{t('localDevHelp')}</p>
-          {localDevEnabled && (
-            <div className="dsh-atlas-manager-path">
-              <label htmlFor={pathId}>{t('localWorkspaceDir')}</label>
-              <div className="dsh-atlas-manager-path-controls">
-                <Input
-                  type="text"
-                  id={pathId}
-                  className="dsh-atlas-manager-path-input"
-                  value={workspaceDir}
-                  placeholder="/path/to/plugins"
-                  spellCheck={false}
-                  autoComplete="off"
-                  aria-describedby={`${pathId}-help`}
-                  aria-invalid={!pathValid}
-                  disabled={!canEdit || busy}
-                  onChange={event => { setDraft(event.currentTarget.value); setSaveFailed(false) }}
-                  onKeyDown={event => { if (event.key === 'Enter') void saveWorkspaceDir() }}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="dsh-atlas-manager-retry"
-                  disabled={!canEdit || busy || !pathValid || !pathDirty}
-                  onClick={() => { void saveWorkspaceDir() }}
-                >
-                  {t('saveWorkspaceDir')}
-                </Button>
-              </div>
-              <p id={`${pathId}-help`} className="dsh-atlas-manager-status" data-error={!pathValid || overview?.workspaceDirIssue ? '' : undefined}>
-                {!pathValid
-                  ? t('invalidWorkspaceDir')
-                  : overview?.workspaceDirIssue ?? t('localWorkspaceDirHelp')}
-              </p>
-            </div>
-          )}
-          {settings.status !== 'loading' && !canEdit && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-          {saveFailed && <p className="dsh-atlas-manager-status" data-error="" role="alert">{t('localDevApplyFailed')}</p>}
-        </section>
-
         <div className="dsh-atlas-manager-heading-row">
           <h4 className="dsh-atlas-manager-heading" id={listId}>{t('atlasBundles')}</h4>
           {expandablePackages.length > 0 && (
@@ -620,12 +415,9 @@ export function apply(ctx: ClientContext): void {
           {ATLASES.map(atlas => {
             const packageName = ATLAS_BUNDLES[atlas]
             const bundle = inventory.find(item => item.name === packageName)
-            const localStatus = statusByPackage.get(packageName)
             const enabled = bundle?.enabled ?? false
             const notInstalled = bundle === undefined || (bundle.availability === 'missing' && !bundle.installed)
-            const localWorkspaceRequired = notInstalled && localDevEnabled && savedWorkspaceDir === undefined
-            const denied = !canToggle || bundle?.readOnlyReason !== undefined
-              || (!enabled && notInstalled && (!canInstall || (localDevEnabled && !canInspect)))
+            const denied = !canToggle || bundle?.readOnlyReason !== undefined || (!enabled && notInstalled && !canInstall)
             const showUninstall = canRemove && canUninstallAtlas(bundle)
             const stage = activity?.atlas === atlas ? activity.stage : undefined
             const notice = stage === undefined ? notices[atlas]?.notice : undefined
@@ -633,7 +425,6 @@ export function apply(ctx: ClientContext): void {
             const status = stage ?? (bundle?.error !== undefined ? 'bundleError'
               : enabled ? 'enabled' : notInstalled ? 'notInstalled' : 'disabled')
             const statusId = `${listId}-${atlas}`
-            const rowError = localDevError?.packageName === packageName ? localDevError : undefined
             const canOpenBundle = !notInstalled && canNavigate
             const settingsEntry = enabled && typeof renderFactorySlot === 'function'
               ? settingsByPackage.get(packageName)
@@ -669,11 +460,6 @@ export function apply(ctx: ClientContext): void {
                         settingsBodyId,
                         canOpenBundle,
                       )}
-                      {localDevEnabled && localStatus?.mode === 'local' && (
-                        <span className="dsh-atlas-manager-tags">
-                          <Tag tone="info" className="dsh-atlas-local-tag">{localTagText(localStatus, t)}</Tag>
-                        </span>
-                      )}
                     </div>
                     <div id={statusId} role="status" tabIndex={-1} ref={node => { memberStatus.current[atlas] = node }}>
                       <p
@@ -684,23 +470,8 @@ export function apply(ctx: ClientContext): void {
                         {t(status)}
                       </p>
                       {denied && <p className="dsh-atlas-manager-status">{t('writeDenied')}</p>}
-                      {localWorkspaceRequired && <p className="dsh-atlas-manager-status">{t('localWorkspaceRequired')}</p>}
                       {notice && <NoticeLine notice={notice} />}
                     </div>
-                    {localDevEnabled && localStatus && (
-                      <LocalDevControls
-                        status={localStatus}
-                        busy={busy}
-                        canSwitch={canSwitchLocal}
-                        onAction={req => { void runLocalDevAction(req) }}
-                      />
-                    )}
-                    {rowError && (
-                      <p className="dsh-atlas-manager-status" data-error="" role="alert">
-                        {t(localDevErrorKey(rowError.code))}
-                        {rowError.detail ? ` (${rowError.detail})` : ''}
-                      </p>
-                    )}
                     {detail && <details className="dsh-atlas-manager-status dsh-atlas-manager-detail">
                       <summary>{t('details')}</summary>
                       <code>{detail}</code>
@@ -725,9 +496,9 @@ export function apply(ctx: ClientContext): void {
                     <Switch
                       checked={enabled}
                       label={t(atlas)}
-                      disabled={busy || denied || localWorkspaceRequired}
+                      disabled={busy || denied}
                       onChange={next => {
-                        if (!busy && !denied && !localWorkspaceRequired) {
+                        if (!busy && !denied) {
                           void toggle(atlas, next)
                         }
                       }}
@@ -748,72 +519,53 @@ export function apply(ctx: ClientContext): void {
           })}
         </ul>
 
-        {discoveredAggregates.length > 0 && (
+        {discoveredRows.length > 0 && (
           <>
             <h5 className="dsh-atlas-manager-subheading">{t('otherAggregates')}</h5>
             <ul className="dsh-atlas-manager-list" data-discovered-aggregates="">
-              {discoveredAggregates.map((item, index) => {
-                const rowError = localDevError?.packageName === item.packageName ? localDevError : undefined
-                const canOpenBundle = item.installed && canNavigate
-                const settingsEntry = item.enabled && typeof renderFactorySlot === 'function'
-                  ? settingsByPackage.get(item.packageName)
+              {discoveredRows.map(({ discovered: item, bundle }, index) => {
+                const displayName = bundle.meta?.title ? ctx.locale.resolveText(bundle.meta.title) : bundle.name
+                const canOpenBundle = bundle.installed && canNavigate
+                const settingsEntry = bundle.enabled && typeof renderFactorySlot === 'function'
+                  ? settingsByPackage.get(bundle.name)
                   : undefined
                 const canExpand = settingsEntry !== undefined
-                const isExpanded = canExpand && Boolean(expandedBundles[item.packageName])
+                const isExpanded = canExpand && Boolean(expandedBundles[bundle.name])
                 const settingsBodyId = `${listId}-discovered-${index}-settings`
-                const memberCount = item.members.length > 0 ? item.members.length : settingsEntry?.count
-                const onIconPress = canExpand ? () => toggleExpanded(item.packageName) : undefined
+                const memberCount = countBundleMembers(bundle, item.memberCount)
+                const onIconPress = canExpand ? () => toggleExpanded(bundle.name) : undefined
                 return (
                   <li
-                    key={item.packageName}
+                    key={bundle.name}
                     className="dsh-atlas-manager-row"
-                    data-atlas-state={item.enabled ? 'on' : 'off'}
+                    data-atlas-state={bundle.enabled ? 'on' : 'off'}
                   >
                     <div className="dsh-atlas-manager-row-main">
                       <BundleRowIcon
-                        src={ATLAS_ICONS.plugin}
+                        src={bundle.meta?.icon || ATLAS_ICONS.plugin}
                         size={24}
                         onPress={onIconPress}
                       />
                       <div className="dsh-atlas-manager-copy">
                         <div className="dsh-atlas-manager-label">
                           {renderBundleHeading(
-                            item.packageName,
-                            item.packageName,
+                            bundle.name,
+                            displayName,
                             canExpand,
                             isExpanded,
                             memberCount,
                             settingsBodyId,
                             canOpenBundle,
                           )}
-                          {localDevEnabled && item.mode === 'local' && (
-                            <span className="dsh-atlas-manager-tags">
-                              <Tag tone="info" className="dsh-atlas-local-tag">{localTagText(item, t)}</Tag>
-                            </span>
-                          )}
                         </div>
                         <p className="dsh-atlas-manager-status">
-                          {t(item.enabled ? 'enabled' : 'disabled')} · {item.members.length}
+                          {t(bundle.enabled ? 'enabled' : 'disabled')} · {memberCount ?? item.memberCount}
                         </p>
-                        {localDevEnabled && (
-                          <LocalDevControls
-                            status={item}
-                            busy={busy}
-                            canSwitch={canSwitchLocal}
-                            onAction={req => { void runLocalDevAction(req) }}
-                          />
-                        )}
-                        {rowError && (
-                          <p className="dsh-atlas-manager-status" data-error="" role="alert">
-                            {t(localDevErrorKey(rowError.code))}
-                            {rowError.detail ? ` (${rowError.detail})` : ''}
-                          </p>
-                        )}
                       </div>
                       <div className="dsh-atlas-manager-control" />
                     </div>
                     {isExpanded && (
-                      <div id={settingsBodyId} className="dsh-atlas-settings-body" data-atlas-settings-body={item.packageName}>
+                      <div id={settingsBodyId} className="dsh-atlas-settings-body" data-atlas-settings-body={bundle.name}>
                         {renderDynamicFactorySlot(renderFactorySlot!, settingsEntry.factoryName, {
                           view: 'page',
                           canToggle: canToggleMembers,
@@ -871,7 +623,6 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     const refreshIfObserved = () => {
       if (observing) void refresh()
-      else emitLocalDevUpdate()
     }
     const changed = ctx.remote.$on('plugin-manager/changed', refreshIfObserved)
     const reset = ctx.on('connection/reset', refreshIfObserved)
@@ -881,73 +632,12 @@ export function apply(ctx: ClientContext): void {
         <AtlasPanel {...props} />
       </>
     )))
-    let detailBadge: (() => void) | undefined
-    let detailSection: (() => void) | undefined
-    const disposeDetailSlots = () => {
-      detailSection?.()
-      detailSection = undefined
-      detailBadge?.()
-      detailBadge = undefined
-    }
-    const syncDetailSlots = () => {
-      if (disposed) return
-      const enabled = typeof localDevForm?.getSnapshot === 'function'
-        && localDevForm.getSnapshot().value?.localDevEnabled === true
-      if (!enabled) {
-        disposeDetailSlots()
-        return
-      }
-      if (detailBadge === undefined) {
-        detailBadge = ctx.slots.inject(DETAIL_BADGE_SLOT, () => ctx.slots.register({
-          name: DETAIL_BADGE_SLOT,
-          id: PACKAGE,
-          locale: NS,
-        }, ({ subject, t: slotT }: DetailBadgeSlotProps & { t: AtlasPanelLocale }) => (
-          <LocalDevBadge
-            subject={subject}
-            form={localDevForm}
-            t={slotT}
-            subscribeUpdates={subscribeLocalDevUpdate}
-          />
-        )))
-      }
-      if (detailSection === undefined) {
-        detailSection = ctx.slots.inject(DETAIL_SECTION_SLOT, () => ctx.slots.register({
-          name: DETAIL_SECTION_SLOT,
-          id: PACKAGE,
-          locale: NS,
-        }, ({ subject, t: slotT, useRemoteAccess }: DetailSectionSlotProps & { t: AtlasPanelLocale }) => {
-          const canInstall = useRemoteAccess('pluginManager/installBundle')
-          const canRemove = useRemoteAccess('pluginManager/removeBundle')
-          return (
-            <LocalDevDetailSection
-              subject={subject}
-              form={localDevForm}
-              t={slotT}
-              canSwitch={canInstall && canRemove}
-              subscribeUpdates={subscribeLocalDevUpdate}
-              notifyUpdate={() => {
-                emitLocalDevUpdate()
-                if (observing) void refresh()
-              }}
-            />
-          )
-        }))
-      }
-    }
-    syncDetailSlots()
-    const unsubscribeForm = typeof localDevForm?.subscribe === 'function'
-      ? localDevForm.subscribe(syncDetailSlots)
-      : () => {}
+
     return () => {
       disposed = true
-      unsubscribeForm()
-      disposeDetailSlots()
       panel()
       reset()
       changed()
     }
   }, `${NS}: detail panel`)
 }
-
-type AtlasPanelLocale = PropsLocale<typeof NS>['t']

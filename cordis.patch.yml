@@ -1,4 +1,4 @@
-# The Host owns the settings schema. The Client half renders the Atlas manager.
+# The Host discovers installed dsh.aggregate bundles. The Client renders the Atlas manager.
 - insert:
     - id: dsh-atlas-atlas
       name: '@miorin/dsh-atlas-atlas'

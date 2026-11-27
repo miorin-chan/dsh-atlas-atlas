@@ -1,8 +1,8 @@
 # Third-party notices
 
-Atlas manager uses `@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5` components (`Button`, `Switch`,
-`Tooltip`) and adapts the inward-chevron mirror icon from `IconChevronsUpDownOutlineMedium` (`src/icons/artwork.ts`,
-`'chevrons-up-down-outline'`).
+Atlas manager uses `@deepseek-ai/dsh-client-ui-primitives@0.2.2-rc.5` components (`Button`,
+`Modal`, `StateDot`, `Switch`, `Tooltip`) and adapts the inward-chevron mirror icon
+from `IconChevronsUpDownOutlineMedium` (`src/icons/artwork.ts`, `'chevrons-up-down-outline'`).
 The uninstall button follows the danger outline styling in `@deepseek-ai/dsh-client-ui-plugin-manager@0.2.2-rc.5`,
 `src/client/PluginManagerPage.module.css` (`.danger`).
 
@@ -24,11 +24,6 @@ INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PA
 IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-## Host configuration schema
-
-The Host artifact bundles `@deepseek-ai/schemastery` 3.19.0 and `@deepseek-ai/cosmokit` 1.9.0.
-The MIT license text above also applies to these packages, copyright (c) 2021–present Shigma.
 
 ## Atlas member icons
 

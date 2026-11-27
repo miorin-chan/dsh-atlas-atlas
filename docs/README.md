@@ -1,6 +1,6 @@
 # 模块模块化改良计划开发与验证
 
-[使用说明](../README.zh.md)介绍管理卡的安装和七个开关。
+[使用说明](../README.zh.md)介绍管理卡的安装与七个开关。
 
 ## 命名与本地化
 
@@ -11,69 +11,36 @@
 
 ## 行为
 
-管理卡通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、脉络、
-外观的顺序渲染七个开关，并基于 `dsh.aggregate` 自动发现 profile 中已安装的其他聚合包。
-它从 `pluginManager.listBundles` 获取当前 profile 的整包状态，并在收到 `plugin-manager/changed` 或连接恢复后更新。
+管理卡本身不依赖第三方运行时 npm 包，通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、
+脉络、外观的顺序渲染七个开关，同时提供零依赖只读 Host 路由 `GET /api/dsh-atlas-aggregates`（浏览器会话鉴权），
+从已安装 profile 包的 `package.json` 读取 `dsh.aggregate` 声明以发现包括未启用聚合包在内的第三方聚合包。
+管理卡从 `pluginManager.listBundles` 获取当前 profile 的整包状态，
+并在收到 `plugin-manager/changed` 或连接恢复后同步刷新。
 对已启用且暴露了 `dsh-aggregate.config:<bundleName>` Slot Factory 的聚合包（包含官方七个与自动发现的聚合包），
 管理卡订阅 `plugins.bundle.config` 与成员子槽变更，
 在唯一列表内直接将可配置成员的标题（及图标）作为展开/折叠开关（默认收起）：
 点击标题后就在该行下方缩进并带竖向引导线原位展开全部活跃成员设置（内部各子插件同样以子标题控制折叠/展开）。
-对于已安装的官方或自动发现的聚合包，无内联设置的包可直接点击行内图标/标题跳转详情页，
-有内联设置的包可在标题右侧点击独立跳转按钮调用 `ctx.pluginNavigation.openBundle` 打开详情页（未安装包保持静态展示）。
+对于已安装的官方或自动发现的聚合包，点击标题右侧跳转按钮调用 `ctx.pluginNavigation.openBundle` 打开详情页。
 
-开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，
-优先请求 npm 公共 registry，保存实际安装的精确版本。
-开启「启用本地仓库链接」并保存有效的 `localWorkspaceDir` 后，开启尚未安装的成员包（含脉络、
-外观）直接通过 `prepare-local` 校验并制备本地安装目标（单包为 `link:<localWorkspaceDir>/dsh-atlas-<atlas>`，
-聚合包为包含全部本地子插件的 profile 私有 overlay），不回退到 npm（未保存有效目录时拦截并提示配置）；
-对已安装的成员包做启停切换则始终保留当前安装来源。
+开启尚未安装的成员包时，管理卡按包名调用 DSH 的 `installBundle`，请求 npm 公共 registry，保存实际安装的精确版本。
 安装后先读取目标 bundle，检查行 ID 是否已由其他启用的 bundle 定义，再保存启用状态。
 若启用在保存选择后失败，管理卡尝试恢复停用状态并报告结果。
-默认与本地模式下，再次开启和关闭已安装成员都直接调用 `setBundleEnabled`，复用已有安装与逐项设置。
-
-## 本地开发切换（npm 与本地仓库二态）
-
-Host 在 `Config` 中维护 `localDevEnabled`（默认 `false`）和 `localWorkspaceDir`（默认 `''`），
-并通过受浏览器会话鉴权的 `POST /api/dsh-atlas-local-dev` 路由提供 `overview`、`inspect`、`prepare-local`、
-`switch`（`local` | `npm`）与 `switch-member`（聚合包内单成员 `local` | `npm`）：
-
-- **无状态单一事实源**：管理卡不在磁盘维护第二套 `state.json` 或 baseline 版本记忆，
-  直接根据 DSH 返回的 `BundleInfo.source`（`link:` 判定为 `local`，
-  registry 判定为 `npm`）与已安装目录的依赖软链真实路径识别聚合包及每个成员的当前模式。
-- **切换到本地（`mode: 'local'`）**：
-  - 普通单插件直接链接 `link:<localWorkspaceDir>/<basename>`；
-  - 声明 `dsh.aggregate` 的聚合包，若全部成员均已在 `<localWorkspaceDir>` 就绪，
-    则在 profile 私有目录 `<profileDir>/dsh-atlas-local-dev/overlays/<safePkg>/<id>/` 合成全本地 overlay；
-    若部分成员仅存在于聚合包自带依赖中，也可先直接链接 `link:<localWorkspaceDir>/<basename>`（不阻塞切换到本地），
-    或随后用「全部切到本地」一键升级为全本地 overlay。
-- **上级本地门控的逐成员切换（`switch-member`）**：仅当聚合包本身处于 `local` 模式时开放；
-  将单个成员切到 `local` 会从 `<localWorkspaceDir>/<member>` 链接该成员并合成混合 overlay，
-  其余仍为 `npm` 的成员继续链接 `<localWorkspaceDir>/<basename>/node_modules` 中的随包依赖；当所有成员都
-  切回 `npm` 时自动退回直接链接 `link:<localWorkspaceDir>/<basename>` 并清理 overlay 目录（全程不写入用户源码目录）。
-- **切回 npm（`mode: 'npm'`）**：直接移除本地/overlay 安装并从 npm 公共 registry 安装最新发行版（保留原 `enabled` 状态；
-  不需要配置 `localWorkspaceDir`），替换成功后再回收旧 overlay 目录；
-  若安装失败则保留原 overlay 并尽最大努力恢复原本地安装。
-- `localDevEnabled` 关闭时，详情页动态卸载 `plugins.detail.badge` 与 `plugins.detail.section`；
-  开启后不仅支持已安装第三方包详情页（`subject.kind === 'bundle'`），
-  还支持本地聚合包内子插件行详情页（`subject.kind === 'row'`），部分本地的聚合包徽章显示 `本地 (k/n)`。
+开启和关闭已安装成员时直接调用 `setBundleEnabled`，完整保留已有安装来源（包括本地链接或 overlay）与逐项设置。
 
 成员已安装、已停用且可卸载时，成员开关旁显示红色垃圾桶。
-确认时重新检查成员状态，再调用 DSH 的 `removeBundle`。
-这会从当前 profile 的依赖清单移除成员，保留本地仓库文件。
+确认时重新检查成员状态，再调用 DSH 的 `removeBundle` 从当前 profile 移除成员，保留本地目录文件。
+
+本地源码切换、聚合包 overlay 组装以及逐个子插件的 npm/本地切换能力已拆出到独立开发者插件
+[模块化改良计划本地开发](../../dsh-atlas-dev/docs/README.md)（`@miorin/dsh-atlas-dev`），
+使本管理器保持零运行时依赖，同时让 `@miorin/dsh-atlas-dev` 能够直接切换 `@miorin/dsh-atlas-atlas` 自身的安装来源。
 
 ## 成员图标
 
 开关行显示各成员包的图标。日常构建和页面直接使用随插件保存的图标，成员尚未安装时也有图标。
-[图标清单](../src/client/published-icons.ts) 记录包名、版本和资源路径。
-List、Continuity 与 Visual 图标当前取自本地源码，对应计划发布的 npm `0.1.0`。
-`npm pack` 在打包前执行 `npm run sync:atlas-icons`，从全部成员包的 `latest` 版本读取图标，再构建客户端。
-七个聚合包发布后即可执行这一步。
+[图标清单](../src/client/published-icons.ts)记录包名、版本和资源路径。
+`npm pack` 在打包前执行 `npm run sync:atlas-icons`，从全部成员包的 `latest` 版本读取图标再构建客户端。
 
 ## 本地安装与开发检查
-
-在新检出的仓库中先运行下面的依赖安装命令，`prepare` 会构建插件。
-本地安装时，随后在 DSH 的 **插件 → 添加插件** 中选择该目录。
-开发检查按以下顺序执行。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -81,41 +48,24 @@ npm test
 npm run check
 ```
 
-测试直接导入从 `src/lib/atlas.ts` 编译的 `lib/atlas.js`，Git 忽略这份产物。
-`npm test` 会先构建再运行测试。`npm run check` 读取现有产物并核对它们与源码是否一致。
-
-从工作区运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
-测试覆盖 npm 首次安装、`prepare-local` 本地安装、已有安装复用、
-npm 与本地仓库（含聚合包 overlay 合成与 GC）二态切换及失败恢复，以及包文件缺失、并行安装、行 ID 冲突和启用失败后的状态。
-客户端测试核对插槽注册和释放、开关顺序与八语标题。
-开关适配的官方代码版本和许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)。
+测试直接导入从 `src/lib/atlas.ts` 和 `src/lib/discover-aggregates.ts` 编译的 `lib/*.js` 产物，Git 忽略这些产物。
+从工作区根目录运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
+开关适配的官方代码版本和许可见[第三方声明](../THIRD-PARTY-NOTICES.md)。
 
 ## 一次性 profile 实测（0.1.0）
 
 2026-11-23，使用 DSH `0.2.2-rc.5` 与 Chrome 驱动。
 在一次性 `DSH_HOME` 安装管理插件的打包产物，模型引导使用回环夹具。
 
-- 四项初始均为未安装。逐一开启后，profile 记录四个从 npm 安装的 `0.1.0` 及对应的 bundle 选择。
-- 各项关闭、重新开启时，另外三个 Atlas 保持启用，依赖清单和 lockfile 保持一致。
-- 将一次性 profile 的 `@miorin` registry 指向返回 404 的回环夹具时，
-  移动端开关显示 npm 安装失败与重试提示，profile 清单和 lockfile 均保持一致。
-  恢复 npm 后，用同一个开关完成安装。
-- 在原生会话 Atlas 卡上关闭会话标题历史，整包停用再启用后，成员开关仍为关闭。
-  管理卡整体停用时，详情区四个控制消失。
-- 重载页面后确认状态，并检查英文浅色、英文深色和中文深色界面。
-  Chrome 未报告未捕获异常或 Atlas 插槽错误。
+- 初始未安装项逐一开启后，profile 记录从 npm 安装的 `0.1.0` 及对应的 bundle 选择；
+  关闭和重开时其余项与 lockfile 保持一致。
+- 将 registry 指向返回 404 的回环夹具时，开关显示 npm 安装失败与重试提示；恢复 npm 后可用同一开关完成安装。
+- 关闭或恢复整包均保留子插件开关设置；管理卡整体停用时控制入口全部卸载。
 
 ## 一次性 profile 实测（单一列表与行内子标题折叠设置）
 
 2026-11-25，使用 DSH `0.2.2-rc.5` 与 `tools/dsh-web-drive` 在一次性 `web` profile 加载 `dsh-atlas-atlas`、
 `dsh-atlas-list` 与 `dsh-atlas-workspace`。
 
-- 管理卡仅保留单一成员包列表（共 7 项，不重复展示第二份设置列表），默认全部收起；
-  点击 List Atlas 标题后在行内下方缩进 `20px` 并带 `1px` 左引导线展开其子插件设置，
-  Workspace Atlas 不显示多余设置折叠按钮。
-- 点击 List Atlas 标题旁跳转按钮直接打开 `@miorin/dsh-atlas-list` 详情页；
-  详情页仅展示单一列表「子插件及设置」（5 项子插件），
-  原生 `[data-plugin-rows]` 初始为 `display: none` 且可通过底部开关展开；
-  同时展开两项带设置的子插件标题后均在各自下方原位缩进展开设置，不重复出现内层子插件标题。
-- Workspace Atlas（0 个可配置成员）展示单一列表「子插件」（4 项）并软折叠原生 `[data-plugin-rows]`；
-  全程无控制台错误、未捕获异常或日志报错。
+- 管理卡仅保留单一成员包列表，点击 List Atlas 标题在行内下方缩进展开子插件设置，
+  点击跳转按钮打开 `@miorin/dsh-atlas-list` 详情页；全程无控制台错误、未捕获异常或日志报错。

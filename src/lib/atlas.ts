@@ -1,7 +1,14 @@
 import type { BundleInfo, ChangeResult, ClientRemote, RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
-import { NPM_REGISTRY } from './local-dev-types.js'
 
 export const PACKAGE = '@miorin/dsh-atlas-atlas'
+export const ENTRY_ID = 'dsh-atlas-atlas'
+export const AGGREGATES_ROUTE = '/api/dsh-atlas-aggregates'
+export const NPM_REGISTRY = 'https://registry.npmjs.org/'
+
+export interface DiscoveredAggregate {
+  readonly packageName: string
+  readonly memberCount: number
+}
 export const ATLAS_BUNDLES = {
   workspace: '@miorin/dsh-atlas-workspace',
   session: '@miorin/dsh-atlas-session',
@@ -14,33 +21,15 @@ export const ATLAS_BUNDLES = {
 
 export type Atlas = keyof typeof ATLAS_BUNDLES
 
-export type Manager = Pick<ClientRemote['pluginManager'], 'listBundles' | 'installBundle' | 'setBundleEnabled' | 'inspect' | 'removeBundle'>
-export const ENTRY_ID = 'dsh-atlas-atlas'
-export interface LocalInstallOptions {
-  readonly localDevEnabled: boolean
-  readonly localWorkspaceDir?: string
-  readonly prepareLocal?: (packageName: string) => Promise<
-    | { readonly ok: true; readonly spec: string; readonly version: string }
-    | { readonly ok: false; readonly detail?: string }
-  >
-}
+export type Manager = Pick<ClientRemote['pluginManager'], 'listBundles' | 'installBundle' | 'setBundleEnabled' | 'removeBundle'>
 
 export type Progress = 'installing' | 'enabling' | 'disabling' | 'uninstalling'
-export type Failure = 'installFailed' | 'localLinkFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
+export type Failure = 'installFailed' | 'enableFailed' | 'disableFailed' | 'inventoryFailed' | 'rollbackFailed' | 'uninstallFailed'
 export type Notice =
-  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'localWorkspaceRequired' | 'uninstallUnavailable' }
+  | { kind: 'restart' | 'overridden' | 'cancelled' | 'bundleMissing' | 'uninstallUnavailable' }
   | { kind: Failure; detail?: string }
   | { kind: 'conflict'; bundle: string; row: string }
   | { kind: 'continuityConflict' }
-
-export function normalizeWorkspaceDir(input: string | undefined): string | undefined {
-  if (input === undefined) return undefined
-  const trimmed = input.trim()
-  if (trimmed === '' || /[\u0000-\u001f]/u.test(trimmed)) return undefined
-  if (!trimmed.startsWith('/') && !/^[a-z]:[\\/]|^\\\\[^\\]+\\[^\\]+/i.test(trimmed)) return undefined
-  if (trimmed === '/' || /^[a-z]:[\\/]$/i.test(trimmed)) return trimmed
-  return trimmed.replace(/[\\/]+$/, '') || '/'
-}
 
 function resultValue<T>(answer: RemoteResult<T>): T {
   if (!answer.ok) throw new Error(answer.error.message)
@@ -107,7 +96,6 @@ export async function setAtlasEnabled(
   atlas: Atlas,
   enabled: boolean,
   progress: (stage: Progress) => void,
-  local?: LocalInstallOptions,
 ): Promise<Notice | undefined> {
   const name = ATLAS_BUNDLES[atlas]
   let failure: Failure = 'inventoryFailed'
@@ -119,62 +107,26 @@ export async function setAtlasEnabled(
 
     if (enabled && (bundle === undefined || bundle.availability === 'missing')) {
       if (bundle?.installed) return { kind: 'bundleMissing' }
-      if (local?.localDevEnabled === true) {
-        const workspaceDir = normalizeWorkspaceDir(local.localWorkspaceDir)
-        if (workspaceDir === undefined) return { kind: 'localWorkspaceRequired' }
-        progress('installing')
-        failure = 'localLinkFailed'
-        if (local.prepareLocal === undefined) {
-          return { kind: 'localLinkFailed', detail: name }
-        }
-        const prepared = await local.prepareLocal(name)
-        if (!prepared.ok) {
-          return { kind: 'localLinkFailed', detail: prepared.detail ?? name }
-        }
-        const inspection = resultValue(await manager.inspect(prepared.spec, {}))
-        if (inspection.status !== 'accepted' || inspection.kind !== 'path' || inspection.name !== name
-          || inspection.bundle !== true || inspection.version !== prepared.version) {
-          return { kind: 'localLinkFailed', detail: inspection.status === 'refused' ? inspection.reason : prepared.spec }
-        }
-        const result = resultValue(await manager.installBundle(prepared.spec, {
-          enabled: false,
-          expected: { name, version: prepared.version },
-        }))
-        if (result.application === 'restart-required') {
-          restart = { kind: 'restart' }
-        } else if (result.error?.code !== 'already-installed') {
-          const notice = outcome(result, failure)
-          if (notice !== undefined) return notice
-        }
-        failure = 'inventoryFailed'
-        inventory = resultValue(await manager.listBundles())
-        bundle = inventory.find(item => item.name === name)
-        if (bundle === undefined || bundle.availability === 'missing') {
-          return restart ?? { kind: 'localLinkFailed', detail: prepared.spec }
-        }
-        if (bundle.enabled) return restart
-      } else {
-        progress('installing')
-        failure = 'installFailed'
-        const result = resultValue(await manager.installBundle(name, {
-          registry: NPM_REGISTRY,
-          saveExact: true,
-          enabled: false,
-        }))
-        if (result.application === 'restart-required') {
-          restart = { kind: 'restart' }
-        } else if (result.error?.code !== 'already-installed') {
-          const notice = outcome(result, failure)
-          if (notice !== undefined) return notice
-        }
-        failure = 'inventoryFailed'
-        inventory = resultValue(await manager.listBundles())
-        bundle = inventory.find(item => item.name === name)
-        if (bundle === undefined || bundle.availability === 'missing') {
-          return restart ?? { kind: 'installFailed', detail: name }
-        }
-        if (bundle.enabled) return restart
+      progress('installing')
+      failure = 'installFailed'
+      const result = resultValue(await manager.installBundle(name, {
+        registry: NPM_REGISTRY,
+        saveExact: true,
+        enabled: false,
+      }))
+      if (result.application === 'restart-required') {
+        restart = { kind: 'restart' }
+      } else if (result.error?.code !== 'already-installed') {
+        const notice = outcome(result, failure)
+        if (notice !== undefined) return notice
       }
+      failure = 'inventoryFailed'
+      inventory = resultValue(await manager.listBundles())
+      bundle = inventory.find(item => item.name === name)
+      if (bundle === undefined || bundle.availability === 'missing') {
+        return restart ?? { kind: 'installFailed', detail: name }
+      }
+      if (bundle.enabled) return restart
     }
 
     if (enabled && bundle !== undefined) {
