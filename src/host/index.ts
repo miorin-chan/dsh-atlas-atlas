@@ -5,7 +5,6 @@ import type {} from '@deepseek-ai/dsh-settings'
 // Bundled from @deepseek-ai/schemastery 3.19.0, src/index.ts (object, boolean, string).
 import Schema from '@deepseek-ai/schemastery'
 import { LocalDevService } from '../lib/local-dev-service.js'
-import { LocalDevStore } from '../lib/local-dev-store.js'
 import { LOCAL_DEV_ROUTE, LocalDevError, parseLocalDevRequest } from '../lib/local-dev-types.js'
 
 // @deepseek-ai/dsh-app-boot@0.2.2-rc.5 exposes ctx.profileContext.dir on Host profiles.
@@ -36,11 +35,9 @@ export function apply(ctx: Context, config: Configuration): void {
 
   ctx.inject(['connection', 'pluginManager', 'profileContext'], scope => {
     const profileDir = scope.profileContext.dir
-    const store = new LocalDevStore(profileDir)
     const service = new LocalDevService({
       manager: scope.pluginManager,
       profileDir,
-      store,
       isEnabled: () => config.localDevEnabled.get(),
       getWorkspaceDir: () => config.localWorkspaceDir.get(),
     })

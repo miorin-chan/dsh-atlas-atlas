@@ -47,7 +47,7 @@ import type {
   LocalDevRequest,
 } from '../lib/local-dev-types.js'
 import { LABELS, localDevErrorKey, type AtlasLabelKey } from './labels.js'
-import { fetchLocalDevOverview, requestLocalDev } from './local-dev-api.js'
+import { fetchLocalDevOverview, prepareBundleLocalDev, requestLocalDev } from './local-dev-api.js'
 import { LocalDevBadge, LocalDevDetailSection } from './local-dev-detail.js'
 import { ATLAS_ICONS } from './published-icons.js'
 import { CSS } from './styles.js'
@@ -157,6 +157,12 @@ export function apply(ctx: ClientContext): void {
     const notice = await setAtlasEnabled(manager, atlas, enabled, progress, {
       localDevEnabled: cfg?.localDevEnabled === true,
       localWorkspaceDir: cfg?.localWorkspaceDir,
+      prepareLocal: async packageName => {
+        const response = await prepareBundleLocalDev(packageName)
+        return response.ok
+          ? { ok: true, spec: response.value.spec, version: response.value.version }
+          : { ok: false, detail: response.detail ?? t(localDevErrorKey(response.error)) }
+      },
     })
     update({ notices: { ...snapshot.notices, [atlas]: notice && { enabled, notice } } })
     await refresh()
@@ -201,61 +207,26 @@ export function apply(ctx: ClientContext): void {
     if (!status.installed) return null
     return (
       <div className="dsh-atlas-local-actions">
-        {status.drifted ? (
+        {status.mode === 'npm' ? (
           <Button
             variant="outline"
             size="sm"
             className="dsh-atlas-local-btn"
-            disabled={busy || !canSwitch}
-            onClick={() => onAction({ action: 'reset-drift', packageName: status.packageName })}
+            disabled={busy || !canSwitch || !status.canSwitchToLocal}
+            onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'local' })}
           >
-            {t('resetDrift')}
+            {t('switchToLocal')}
           </Button>
         ) : (
-          <>
-            {status.selfMode === 'baseline' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="dsh-atlas-local-btn"
-                disabled={busy || !canSwitch || !status.canSwitchSelfToLocal}
-                onClick={() => onAction({ action: 'set-self-mode', packageName: status.packageName, mode: 'local' })}
-              >
-                {t('switchToLocal')}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="dsh-atlas-local-btn"
-                disabled={busy || !canSwitch || !status.canRestoreSelf}
-                onClick={() => onAction({ action: 'set-self-mode', packageName: status.packageName, mode: 'baseline' })}
-              >
-                {t('restoreBaseline')}
-              </Button>
-            )}
-            {status.isAggregate && (status.membersMode === 'bundled' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="dsh-atlas-local-btn"
-                disabled={busy || !canSwitch || !status.canSwitchMembersToLocal}
-                onClick={() => onAction({ action: 'set-members-mode', packageName: status.packageName, mode: 'local' })}
-              >
-                {t('switchMembersToLocal')}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="dsh-atlas-local-btn"
-                disabled={busy || !canSwitch || !status.canRestoreMembers}
-                onClick={() => onAction({ action: 'set-members-mode', packageName: status.packageName, mode: 'bundled' })}
-              >
-                {t('restoreMembersBundled')}
-              </Button>
-            ))}
-          </>
+          <Button
+            variant="outline"
+            size="sm"
+            className="dsh-atlas-local-btn"
+            disabled={busy || !canSwitch || !status.canSwitchToNpm}
+            onClick={() => onAction({ action: 'switch', packageName: status.packageName, mode: 'npm' })}
+          >
+            {t('switchToNpm')}
+          </Button>
         )}
       </div>
     )
@@ -674,10 +645,9 @@ export function apply(ctx: ClientContext): void {
                         settingsBodyId,
                         canOpenBundle,
                       )}
-                      {localDevEnabled && localStatus && (localStatus.selfMode === 'local' || localStatus.membersMode === 'local') && (
+                      {localDevEnabled && localStatus?.mode === 'local' && (
                         <span className="dsh-atlas-manager-tags">
-                          {localStatus.selfMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localPackageTag')}</Tag>}
-                          {localStatus.membersMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localMembersTag')}</Tag>}
+                          <Tag tone="info" className="dsh-atlas-local-tag">{t('localSourceTag')}</Tag>
                         </span>
                       )}
                     </div>
@@ -792,10 +762,9 @@ export function apply(ctx: ClientContext): void {
                             settingsBodyId,
                             canOpenBundle,
                           )}
-                          {localDevEnabled && (item.selfMode === 'local' || item.membersMode === 'local') && (
+                          {localDevEnabled && item.mode === 'local' && (
                             <span className="dsh-atlas-manager-tags">
-                              {item.selfMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localPackageTag')}</Tag>}
-                              {item.membersMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localMembersTag')}</Tag>}
+                              <Tag tone="info" className="dsh-atlas-local-tag">{t('localSourceTag')}</Tag>
                             </span>
                           )}
                         </div>

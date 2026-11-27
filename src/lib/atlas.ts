@@ -1,4 +1,5 @@
 import type { BundleInfo, ChangeResult, ClientRemote, RemoteResult } from '@deepseek-ai/dsh-api-remotes/client'
+import { NPM_REGISTRY } from './local-dev-types.js'
 
 export const PACKAGE = '@miorin/dsh-atlas-atlas'
 export const ATLAS_BUNDLES = {
@@ -18,6 +19,10 @@ export const ENTRY_ID = 'dsh-atlas-atlas'
 export interface LocalInstallOptions {
   readonly localDevEnabled: boolean
   readonly localWorkspaceDir?: string
+  readonly prepareLocal?: (packageName: string) => Promise<
+    | { readonly ok: true; readonly spec: string; readonly version: string }
+    | { readonly ok: false; readonly detail?: string }
+  >
 }
 
 export type Progress = 'installing' | 'enabling' | 'disabling' | 'uninstalling'
@@ -36,20 +41,6 @@ export function normalizeWorkspaceDir(input: string | undefined): string | undef
   if (trimmed === '/' || /^[a-z]:[\\/]$/i.test(trimmed)) return trimmed
   return trimmed.replace(/[\\/]+$/, '') || '/'
 }
-
-export function localAtlasDir(atlas: Atlas): string {
-  const name = ATLAS_BUNDLES[atlas]
-  return name.includes('/') ? name.slice(name.indexOf('/') + 1) : name
-}
-
-export function localAtlasSpec(workspaceDir: string, atlas: Atlas): string {
-  const basename = localAtlasDir(atlas)
-  const sep = workspaceDir.includes('\\') && !workspaceDir.includes('/') ? '\\' : '/'
-  const base = workspaceDir.endsWith('/') || workspaceDir.endsWith('\\') ? workspaceDir : `${workspaceDir}${sep}`
-  return `link:${base}${basename}`
-}
-
-const NPM_REGISTRY = 'https://registry.npmjs.org/'
 
 function resultValue<T>(answer: RemoteResult<T>): T {
   if (!answer.ok) throw new Error(answer.error.message)
@@ -131,17 +122,23 @@ export async function setAtlasEnabled(
       if (local?.localDevEnabled === true) {
         const workspaceDir = normalizeWorkspaceDir(local.localWorkspaceDir)
         if (workspaceDir === undefined) return { kind: 'localWorkspaceRequired' }
-        const spec = localAtlasSpec(workspaceDir, atlas)
         progress('installing')
         failure = 'localLinkFailed'
-        const inspection = resultValue(await manager.inspect(spec, {}))
-        if (inspection.status !== 'accepted' || inspection.kind !== 'path' || inspection.name !== name
-          || inspection.bundle !== true || !inspection.version) {
-          return { kind: 'localLinkFailed', detail: inspection.status === 'refused' ? inspection.reason : spec }
+        if (local.prepareLocal === undefined) {
+          return { kind: 'localLinkFailed', detail: name }
         }
-        const result = resultValue(await manager.installBundle(spec, {
+        const prepared = await local.prepareLocal(name)
+        if (!prepared.ok) {
+          return { kind: 'localLinkFailed', detail: prepared.detail ?? name }
+        }
+        const inspection = resultValue(await manager.inspect(prepared.spec, {}))
+        if (inspection.status !== 'accepted' || inspection.kind !== 'path' || inspection.name !== name
+          || inspection.bundle !== true || inspection.version !== prepared.version) {
+          return { kind: 'localLinkFailed', detail: inspection.status === 'refused' ? inspection.reason : prepared.spec }
+        }
+        const result = resultValue(await manager.installBundle(prepared.spec, {
           enabled: false,
-          expected: { name, version: inspection.version },
+          expected: { name, version: prepared.version },
         }))
         if (result.application === 'restart-required') {
           restart = { kind: 'restart' }
@@ -153,7 +150,7 @@ export async function setAtlasEnabled(
         inventory = resultValue(await manager.listBundles())
         bundle = inventory.find(item => item.name === name)
         if (bundle === undefined || bundle.availability === 'missing') {
-          return restart ?? { kind: 'localLinkFailed', detail: spec }
+          return restart ?? { kind: 'localLinkFailed', detail: prepared.spec }
         }
         if (bundle.enabled) return restart
       } else {

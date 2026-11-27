@@ -5,6 +5,7 @@ import {
   type LocalDevOverview,
   type LocalDevRequest,
   type LocalDevResponse,
+  type PreparedLocalSpec,
 } from '../lib/local-dev-types.js'
 
 type TransportFetch = (input: string, init?: RequestInit) => Promise<Response>
@@ -52,4 +53,8 @@ export function fetchLocalDevOverview(signal?: AbortSignal): Promise<LocalDevRes
 
 export function inspectBundleLocalDev(packageName: string, signal?: AbortSignal): Promise<LocalDevResponse<BundleLocalDevStatus>> {
   return requestLocalDev<BundleLocalDevStatus>({ action: 'inspect', packageName }, signal)
+}
+
+export function prepareBundleLocalDev(packageName: string, signal?: AbortSignal): Promise<LocalDevResponse<PreparedLocalSpec>> {
+  return requestLocalDev<PreparedLocalSpec>({ action: 'prepare-local', packageName }, signal)
 }

@@ -34,9 +34,10 @@ export interface LocalDevDetailProps extends PluginDetailProps {
   readonly notifyUpdate: () => void
 }
 
-function activeLocalDevEnabled(form: LocalDevFormStore): boolean {
-  const snapshot = form.getSnapshot()
-  return snapshot.value?.localDevEnabled === true
+function manageablePackageName(subject: PluginDetailProps['subject']): string | undefined {
+  if (subject.kind !== 'bundle') return undefined
+  if (!subject.pkg.installed || subject.pkg.official || subject.pkg.name === PACKAGE) return undefined
+  return subject.pkg.name
 }
 
 export function LocalDevBadge({ subject, form, t, subscribeUpdates }: LocalDevBadgeProps) {
@@ -47,14 +48,14 @@ export function LocalDevBadge({ subject, form, t, subscribeUpdates }: LocalDevBa
   )
   const enabled = configSnapshot.value?.localDevEnabled === true
   const workspaceDir = configSnapshot.value?.localWorkspaceDir ?? ''
-  const packageName = subject.kind === 'bundle' ? subject.pkg.name : undefined
+  const packageName = manageablePackageName(subject)
   const [status, setStatus] = useState<BundleLocalDevStatus>()
   const [tick, setTick] = useState(0)
 
   useEffect(() => subscribeUpdates(() => setTick(n => n + 1)), [subscribeUpdates])
 
   useEffect(() => {
-    if (!enabled || packageName === undefined || packageName === PACKAGE) {
+    if (!enabled || packageName === undefined) {
       setStatus(undefined)
       return
     }
@@ -65,15 +66,13 @@ export function LocalDevBadge({ subject, form, t, subscribeUpdates }: LocalDevBa
     return () => controller.abort()
   }, [enabled, workspaceDir, packageName, tick])
 
-  if (!enabled || status === undefined) return null
-  if (status.selfMode !== 'local' && status.membersMode !== 'local') return null
+  if (!enabled || status === undefined || status.mode !== 'local') return null
 
   return (
     <>
       <style>{CSS}</style>
       <span className="dsh-atlas-manager-tags" data-atlas-local-badges={status.packageName}>
-        {status.selfMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localPackageTag')}</Tag>}
-        {status.membersMode === 'local' && <Tag tone="info" className="dsh-atlas-local-tag">{t('localMembersTag')}</Tag>}
+        <Tag tone="info" className="dsh-atlas-local-tag">{t('localSourceTag')}</Tag>
       </span>
     </>
   )
@@ -92,9 +91,9 @@ export function LocalDevDetailSection({
     () => form.getSnapshot(),
     () => form.getSnapshot(),
   )
-  const enabled = activeLocalDevEnabled(form) && configSnapshot.value?.localDevEnabled === true
+  const enabled = configSnapshot.value?.localDevEnabled === true
   const workspaceDir = configSnapshot.value?.localWorkspaceDir ?? ''
-  const packageName = subject.kind === 'bundle' ? subject.pkg.name : undefined
+  const packageName = manageablePackageName(subject)
   const [status, setStatus] = useState<BundleLocalDevStatus>()
   const [working, setWorking] = useState(false)
   const [error, setError] = useState<{ code: LocalDevErrorCode; detail?: string }>()
@@ -103,7 +102,7 @@ export function LocalDevDetailSection({
   useEffect(() => subscribeUpdates(() => setTick(n => n + 1)), [subscribeUpdates])
 
   useEffect(() => {
-    if (!enabled || packageName === undefined || packageName === PACKAGE) {
+    if (!enabled || packageName === undefined) {
       setStatus(undefined)
       setError(undefined)
       return
@@ -121,7 +120,7 @@ export function LocalDevDetailSection({
     return () => controller.abort()
   }, [enabled, workspaceDir, packageName, tick])
 
-  if (!enabled || packageName === undefined || packageName === PACKAGE) return null
+  if (!enabled || packageName === undefined) return null
 
   async function runAction(request: LocalDevRequest) {
     if (working) return
@@ -151,42 +150,26 @@ export function LocalDevDetailSection({
       {status === undefined && error === undefined && (
         <p className="dsh-atlas-manager-status" role="status">{t('loading')}</p>
       )}
-      {status?.drifted && (
-        <div className="dsh-atlas-local-feature" role="alert">
-          <div className="dsh-atlas-local-feature-info">
-            <span className="dsh-atlas-local-feature-title">{t('driftedNotice')}</span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="dsh-atlas-local-btn"
-            disabled={working || !canSwitch}
-            onClick={() => { void runAction({ action: 'reset-drift', packageName }) }}
-          >
-            {t('resetDrift')}
-          </Button>
-        </div>
-      )}
       {status !== undefined && (
         <>
-          <div className="dsh-atlas-local-feature" data-local-dev-self={status.selfMode}>
+          <div className="dsh-atlas-local-feature" data-local-dev-mode={status.mode}>
             <div className="dsh-atlas-local-feature-info">
               <span className="dsh-atlas-local-feature-title">
-                {t('localSelfLabel')}: {t(status.selfMode === 'local' ? 'sourceLocal' : 'sourceBaseline')}
+                {t('localSourceLabel')}: {t(status.mode === 'local' ? 'sourceLocal' : 'sourceNpm')}
               </span>
               <span className="dsh-atlas-local-feature-meta">
                 {status.currentSource ?? t('notInstalled')}
-                {status.localCheckoutIssue ? ` · ${status.localCheckoutIssue}` : ''}
+                {status.mode === 'npm' && status.localCheckoutIssue ? ` · ${status.localCheckoutIssue}` : ''}
               </span>
             </div>
             <div>
-              {status.selfMode === 'baseline' ? (
+              {status.mode === 'npm' ? (
                 <Button
                   variant="outline"
                   size="sm"
                   className="dsh-atlas-local-btn"
-                  disabled={working || !canSwitch || !status.canSwitchSelfToLocal}
-                  onClick={() => { void runAction({ action: 'set-self-mode', packageName, mode: 'local' }) }}
+                  disabled={working || !canSwitch || !status.canSwitchToLocal}
+                  onClick={() => { void runAction({ action: 'switch', packageName, mode: 'local' }) }}
                 >
                   {t('switchToLocal')}
                 </Button>
@@ -195,65 +178,28 @@ export function LocalDevDetailSection({
                   variant="outline"
                   size="sm"
                   className="dsh-atlas-local-btn"
-                  disabled={working || !canSwitch || !status.canRestoreSelf}
-                  onClick={() => { void runAction({ action: 'set-self-mode', packageName, mode: 'baseline' }) }}
+                  disabled={working || !canSwitch || !status.canSwitchToNpm}
+                  onClick={() => { void runAction({ action: 'switch', packageName, mode: 'npm' }) }}
                 >
-                  {t('restoreBaseline')}
+                  {t('switchToNpm')}
                 </Button>
               )}
             </div>
           </div>
 
-          {status.isAggregate && (
-            <div data-local-dev-members={status.membersMode}>
-              <div className="dsh-atlas-local-feature">
-                <div className="dsh-atlas-local-feature-info">
-                  <span className="dsh-atlas-local-feature-title">
-                    {t('localMembersLabel')}: {t(status.membersMode === 'local' ? 'membersLocal' : 'membersBundled')}
-                  </span>
-                  <span className="dsh-atlas-local-feature-meta">
-                    {status.members.filter(m => m.available).length}/{status.members.length} {t('memberAvailable')}
-                  </span>
-                </div>
-                <div>
-                  {status.membersMode === 'bundled' ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="dsh-atlas-local-btn"
-                      disabled={working || !canSwitch || !status.canSwitchMembersToLocal}
-                      onClick={() => { void runAction({ action: 'set-members-mode', packageName, mode: 'local' }) }}
-                    >
-                      {t('switchMembersToLocal')}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="dsh-atlas-local-btn"
-                      disabled={working || !canSwitch || !status.canRestoreMembers}
-                      onClick={() => { void runAction({ action: 'set-members-mode', packageName, mode: 'bundled' }) }}
-                    >
-                      {t('restoreMembersBundled')}
-                    </Button>
-                  )}
-                </div>
-              </div>
-              {status.members.length > 0 && (
-                <details className="dsh-atlas-manager-status dsh-atlas-manager-detail">
-                  <summary>{t('memberBreakdown', { count: String(status.members.length) })}</summary>
-                  <ul className="dsh-atlas-local-members-list">
-                    {status.members.map(member => (
-                      <li key={member.name}>
-                        <code>{member.name}</code>{' '}
-                        ({t(member.available ? 'memberAvailable' : 'memberUnavailable')})
-                        {member.version ? ` · v${member.version}` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
+          {status.isAggregate && status.members.length > 0 && (
+            <details className="dsh-atlas-manager-status dsh-atlas-manager-detail">
+              <summary>{t('memberBreakdown', { count: String(status.members.length) })}</summary>
+              <ul className="dsh-atlas-local-members-list">
+                {status.members.map(member => (
+                  <li key={member.name}>
+                    <code>{member.name}</code>{' '}
+                    ({t(member.available ? 'memberAvailable' : 'memberUnavailable')})
+                    {member.version ? ` · v${member.version}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </>
       )}

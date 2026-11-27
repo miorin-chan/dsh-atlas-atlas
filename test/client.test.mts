@@ -248,16 +248,12 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
                   official: false,
                   isAggregate: true,
                   manageable: true,
-                  selfMode: 'local',
-                  membersMode: 'bundled',
-                  canRestoreSelf: true,
-                  canSwitchSelfToLocal: false,
-                  canSwitchMembersToLocal: true,
-                  canRestoreMembers: false,
+                  mode: 'local',
+                  canSwitchToLocal: false,
+                  canSwitchToNpm: true,
                   localCheckoutAvailable: true,
-                  members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: true, activeLocal: false }],
+                  members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: true }],
                   membersReady: true,
-                  drifted: false,
                 },
               ],
             },
@@ -276,19 +272,15 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
             official: false,
             isAggregate: body.packageName === '@miorin/dsh-atlas-list',
             manageable: true,
-            selfMode: 'local',
-            membersMode: body.packageName === '@miorin/dsh-atlas-list' ? 'local' : 'bundled',
+            mode: 'local',
             currentSource: `link:/repos/${body.packageName.split('/')[1]}`,
-            canRestoreSelf: true,
-            canSwitchSelfToLocal: false,
-            canSwitchMembersToLocal: false,
-            canRestoreMembers: body.packageName === '@miorin/dsh-atlas-list',
+            canSwitchToLocal: false,
+            canSwitchToNpm: true,
             localCheckoutAvailable: true,
             members: body.packageName === '@miorin/dsh-atlas-list'
-              ? [{ name: '@miorin/dsh-watched-sessions', checkoutDir: '/repos/dsh-watched-sessions', available: true, activeLocal: true, version: '0.1.3' }]
+              ? [{ name: '@miorin/dsh-watched-sessions', checkoutDir: '/repos/dsh-watched-sessions', available: true, version: '0.1.3' }]
               : [],
             membersReady: true,
-            drifted: false,
           },
         }
       },
@@ -346,7 +338,7 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
     assert.equal(slots.has('plugins.detail.section'), false)
     assert.equal(slots.has('plugins.detail.badge'), false)
 
-    // Enable localDevEnabled -> detail slots mount, render both Feature 1 and Feature 2, and badge renders Tag pills.
+    // Enable localDevEnabled -> detail slots mount, render binary source control, and badge renders a single Local Tag pill.
     await act(async () => {
       form.snapshot = { ...form.snapshot, value: { ...form.snapshot.value, localDevEnabled: true } }
       for (const listener of form.listeners) listener()
@@ -365,10 +357,10 @@ test('renders seven Atlas switches, discovered aggregates, and gates detail cont
         t: (key: string) => key,
       }))
     })
-    assert.ok(detailView.root.findByProps({ 'data-local-dev-self': 'local' }))
-    assert.ok(detailView.root.findByProps({ 'data-local-dev-members': 'local' }))
+    assert.ok(detailView.root.findByProps({ 'data-local-dev-mode': 'local' }))
+    assert.equal(detailView.root.findAllByProps({ 'data-local-dev-members': 'local' }).length, 0)
     assert.ok(badgeView.root.findByProps({ 'data-atlas-local-badges': '@miorin/dsh-atlas-list' }))
-    assert.equal(badgeView.root.findAllByProps({ 'data-tag-tone': 'info' }).length, 2)
+    assert.equal(badgeView.root.findAllByProps({ 'data-tag-tone': 'info' }).length, 1)
   } finally {
     globalThis.fetch = originalFetch
     if (view !== undefined) act(() => view.unmount())
@@ -384,11 +376,29 @@ test('installs uninstalled Continuity from localWorkspaceDir on toggle in local 
   const bundles = new Map<string, Record<string, unknown>>()
   const remoteCalls: Array<{ op: string; arg: unknown; options?: unknown }> = []
   const originalFetch = globalThis.fetch
-  globalThis.fetch = async () => ({
-    async json() {
-      return { ok: true, value: { enabled: true, workspaceDir: form.snapshot.value.localWorkspaceDir, workspaceDirValid: true, aggregateBundles: [] } }
-    },
-  }) as unknown as Response
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { action?: string; packageName?: string }
+    if (body.action === 'prepare-local') {
+      return {
+        async json() {
+          return {
+            ok: true,
+            value: {
+              spec: 'link:/repos/dsh-atlas-continuity',
+              version: '0.1.0',
+              isAggregate: true,
+              overlayDir: '/repos/dsh-atlas-continuity',
+            },
+          }
+        },
+      } as unknown as Response
+    }
+    return {
+      async json() {
+        return { ok: true, value: { enabled: true, workspaceDir: form.snapshot.value.localWorkspaceDir, workspaceDirValid: true, aggregateBundles: [] } }
+      },
+    } as unknown as Response
+  }
 
   const form = {
     snapshot: { status: 'ready', writable: true, revision: 1, value: { localDevEnabled: true, localWorkspaceDir: '' } },
@@ -535,16 +545,12 @@ test('expands indented aggregate settings inline under bundle title subheadings 
               official: false,
               isAggregate: true,
               manageable: true,
-              selfMode: 'baseline',
-              membersMode: 'bundled',
-              canRestoreSelf: false,
-              canSwitchSelfToLocal: false,
-              canSwitchMembersToLocal: false,
-              canRestoreMembers: false,
+              mode: 'npm',
+              canSwitchToLocal: false,
+              canSwitchToNpm: false,
               localCheckoutAvailable: false,
-              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false, activeLocal: false }],
+              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false }],
               membersReady: false,
-              drifted: false,
             },
           ],
         },
@@ -1068,16 +1074,12 @@ test('navigates to bundle detail pages for installed official and discovered agg
               official: false,
               isAggregate: true,
               manageable: true,
-              selfMode: 'baseline',
-              membersMode: 'bundled',
-              canRestoreSelf: false,
-              canSwitchSelfToLocal: false,
-              canSwitchMembersToLocal: false,
-              canRestoreMembers: false,
+              mode: 'npm',
+              canSwitchToLocal: false,
+              canSwitchToNpm: false,
               localCheckoutAvailable: false,
-              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false, activeLocal: false }],
+              members: [{ name: '@local/member-a', checkoutDir: '/repos/member-a', available: false }],
               membersReady: false,
-              drifted: false,
             },
           ],
         },
@@ -1198,16 +1200,19 @@ test('navigates to bundle detail pages for installed official and discovered agg
       ok: true,
       value: {
         packageName: '@miorin/dsh-atlas-visual',
+        installed: true,
+        enabled: true,
+        official: false,
         isAggregate: true,
-        selfMode: 'local',
-        membersMode: 'baseline',
-        hasLocalCheckout: true,
+        manageable: true,
+        mode: 'local',
+        currentSource: 'link:/tmp/ws/dsh-atlas-visual',
+        canSwitchToLocal: false,
+        canSwitchToNpm: true,
+        localCheckoutAvailable: true,
         localCheckoutDir: '/tmp/ws/dsh-atlas-visual',
-        baselineSpec: '0.1.0',
-        installedSpec: 'link:/tmp/ws/dsh-atlas-visual',
-        baselineReady: true,
-        drift: null,
-        lastError: null,
+        members: [],
+        membersReady: false,
       },
     }), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch
     globalThis.fetch = badgeFetch

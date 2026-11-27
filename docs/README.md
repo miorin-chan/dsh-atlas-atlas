@@ -24,26 +24,31 @@
 开启尚未安装的成员包时，默认模式下管理卡按包名调用 DSH 的 `installBundle`，
 优先请求 npm 公共 registry，保存实际安装的精确版本。
 开启「启用本地仓库链接」并保存有效的 `localWorkspaceDir` 后，开启尚未安装的成员包（含脉络、
-外观）直接校验并安装 `link:<localWorkspaceDir>/dsh-atlas-<atlas>`，不回退到 npm（未保存有效目录时拦截并提示配置）；
+外观）直接通过 `prepare-local` 校验并制备本地安装目标（单包为 `link:<localWorkspaceDir>/dsh-atlas-<atlas>`，
+聚合包为包含全部本地子插件的 profile 私有 overlay），不回退到 npm（未保存有效目录时拦截并提示配置）；
 对已安装的成员包做启停切换则始终保留当前安装来源。
 安装后先读取目标 bundle，检查行 ID 是否已由其他启用的 bundle 定义，再保存启用状态。
 若启用在保存选择后失败，管理卡尝试恢复停用状态并报告结果。
 默认与本地模式下，再次开启和关闭已安装成员都直接调用 `setBundleEnabled`，复用已有安装与逐项设置。
 
-## 双本地链接与开发模式
+## 本地开发切换（npm 与本地仓库二态）
 
 Host 在 `Config` 中维护 `localDevEnabled`（默认 `false`）和 `localWorkspaceDir`（默认 `''`），
-并通过受浏览器会话鉴权的 `POST /api/dsh-atlas-local-dev` 路由提供状态探测与来源切换：
+并通过受浏览器会话鉴权的 `POST /api/dsh-atlas-local-dev` 路由提供 `overview`、`inspect`、`prepare-local`
+与 `switch`（`local` | `npm`）：
 
-- **Feature 1（包本体切本地）**：针对任意可管理的单插件或聚合包，
-  在基线来源与 `link:<localWorkspaceDir>/<basename>` 之间切换。
-- **Feature 2（聚合成员切本地）**：针对声明 `dsh.aggregate` 的聚合包，
-  在 profile 私有目录 `<profileDir>/dsh-atlas-local-dev/overlays/<safePkg>/<id>/` 合成 overlay，
-  用 `yaml` AST 重新生成 `cordis.patch.yml` 并链接本地直接成员，不写入用户源码目录。
-- 两者在聚合包上可正交组合成 4 种状态，每次切换保留原 `enabled` 状态、具备失败回滚和外部漂移保护，
-  并在切换完成后自动回收旧 overlay 目录。
-- `localDevEnabled` 关闭时，详情页 `plugins.detail.badge` 与 `plugins.detail.section` 直接返回 `null` 且不发起请求；
-  开启后在详情页自然底部位置（不使用 CSS `order` hack）按单包或聚合包分别显示控制项。
+- **无状态单一事实源**：管理卡不在磁盘维护第二套 `state.json` 或 baseline 版本记忆，
+  直接根据 DSH 返回的 `BundleInfo.source`（`link:` 判定为 `local`，registry 判定为 `npm`）识别当前模式。
+- **切换到本地（`mode: 'local'`）**：
+  - 普通单插件直接链接 `link:<localWorkspaceDir>/<basename>`；
+  - 声明 `dsh.aggregate` 的聚合包以 `<localWorkspaceDir>/<basename>` 为底在 profile 私有
+    目录 `<profileDir>/dsh-atlas-local-dev/overlays/<safePkg>/<id>/` 合成 overlay，
+    用 `yaml` AST 重新合并全部本地直接成员的 `cordis.patch.yml` 并挂载本地软链，绝不写入用户源码目录。
+- **切回 npm（`mode: 'npm'`）**：直接移除本地/overlay 安装并从 npm 公共 registry 安装最新发行版（保留原 `enabled` 状态；
+  不需要配置 `localWorkspaceDir`），替换成功后再回收旧 overlay 目录；
+  若安装失败则保留原 overlay 并尽最大努力恢复原本地安装。
+- `localDevEnabled` 关闭时，详情页动态卸载 `plugins.detail.badge` 与 `plugins.detail.section`；开启后仅在
+  已安装的第三方可管理包详情页显示轻量「本地」徽章与单一「插件来源」切换区（聚合包附带子插件本地检出状态折叠列表）。
 
 成员已安装、已停用且可卸载时，成员开关旁显示红色垃圾桶。
 确认时重新检查成员状态，再调用 DSH 的 `removeBundle`。
@@ -73,7 +78,8 @@ npm run check
 `npm test` 会先构建再运行测试。`npm run check` 读取现有产物并核对它们与源码是否一致。
 
 从工作区运行 `node tools/new-dsh-plugin/cli.mts --check plugins/dsh-atlas-atlas`。
-测试覆盖 npm 首次安装、本地链接、已有安装复用，以及包文件缺失、并行安装、行 ID 冲突和启用失败后的状态。
+测试覆盖 npm 首次安装、`prepare-local` 本地安装、已有安装复用、
+npm 与本地仓库（含聚合包 overlay 合成与 GC）二态切换及失败恢复，以及包文件缺失、并行安装、行 ID 冲突和启用失败后的状态。
 客户端测试核对插槽注册和释放、开关顺序与八语标题。
 开关适配的官方代码版本和许可见 [第三方声明](../THIRD-PARTY-NOTICES.md)。
 

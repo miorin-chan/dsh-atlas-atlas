@@ -1,47 +1,19 @@
 export const PACKAGE = '@miorin/dsh-atlas-atlas'
 export const ENTRY_ID = 'dsh-atlas-atlas'
 export const LOCAL_DEV_ROUTE = '/api/dsh-atlas-local-dev'
+export const NPM_REGISTRY = 'https://registry.npmjs.org/'
 
-export type SelfMode = 'baseline' | 'local'
-export type MembersMode = 'bundled' | 'local'
+export type SourceMode = 'npm' | 'local'
 
 export interface LocalDevConfig {
   readonly localDevEnabled: boolean
   readonly localWorkspaceDir: string
 }
 
-export interface SourceRef {
-  readonly spec: string
-  readonly version: string
-}
-
-export interface ManagedBundleRecord {
-  readonly packageName: string
-  readonly isAggregate: boolean
-  readonly baseline: {
-    readonly spec: string
-    readonly version: string
-    readonly enabled: boolean
-  }
-  readonly selfMode: SelfMode
-  readonly membersMode: MembersMode
-  readonly activeSpec: string
-  readonly activeVersion: string
-  readonly overlayDir?: string
-  readonly memberPaths?: Readonly<Record<string, string>>
-  readonly updatedAt: string
-}
-
-export interface LocalDevStateFile {
-  readonly version: 1
-  readonly bundles: Readonly<Record<string, ManagedBundleRecord>>
-}
-
 export interface MemberLocalStatus {
   readonly name: string
   readonly checkoutDir: string
   readonly available: boolean
-  readonly activeLocal: boolean
   readonly version?: string
   readonly issue?: string
 }
@@ -63,23 +35,17 @@ export interface BundleLocalDevStatus {
   readonly aggregateVersion?: number
   readonly manageable: boolean
   readonly unmanageableReason?: UnmanageableReason
-  readonly selfMode: SelfMode
-  readonly membersMode: MembersMode
+  readonly mode: SourceMode
   readonly currentSource?: string
   readonly currentVersion?: string
-  readonly baselineSource?: string
-  readonly baselineVersion?: string
-  readonly canRestoreSelf: boolean
-  readonly canSwitchSelfToLocal: boolean
-  readonly canSwitchMembersToLocal: boolean
-  readonly canRestoreMembers: boolean
+  readonly canSwitchToLocal: boolean
+  readonly canSwitchToNpm: boolean
   readonly localCheckoutDir?: string
   readonly localCheckoutAvailable: boolean
   readonly localCheckoutVersion?: string
   readonly localCheckoutIssue?: string
   readonly members: readonly MemberLocalStatus[]
   readonly membersReady: boolean
-  readonly drifted: boolean
   readonly activeOverlayDir?: string
   readonly restartRequired?: boolean
 }
@@ -92,6 +58,13 @@ export interface LocalDevOverview {
   readonly aggregateBundles: readonly BundleLocalDevStatus[]
 }
 
+export interface PreparedLocalSpec {
+  readonly spec: string
+  readonly version: string
+  readonly isAggregate: boolean
+  readonly overlayDir?: string
+}
+
 export type LocalDevErrorCode =
   | 'disabled'
   | 'no-workspace-dir'
@@ -101,13 +74,10 @@ export type LocalDevErrorCode =
   | 'protected'
   | 'not-installed'
   | 'not-manageable'
-  | 'not-aggregate'
   | 'missing-checkout'
   | 'invalid-checkout'
-  | 'external-drift'
   | 'overlay-failed'
   | 'switch-failed'
-  | 'rollback-failed'
 
 export class LocalDevError extends Error {
   constructor(
@@ -122,9 +92,8 @@ export class LocalDevError extends Error {
 export type LocalDevRequest =
   | { readonly action: 'overview' }
   | { readonly action: 'inspect'; readonly packageName: string }
-  | { readonly action: 'set-self-mode'; readonly packageName: string; readonly mode: SelfMode }
-  | { readonly action: 'set-members-mode'; readonly packageName: string; readonly mode: MembersMode }
-  | { readonly action: 'reset-drift'; readonly packageName: string }
+  | { readonly action: 'switch'; readonly packageName: string; readonly mode: SourceMode }
+  | { readonly action: 'prepare-local'; readonly packageName: string }
 
 export type LocalDevResponse<T = unknown> =
   | { readonly ok: true; readonly value: T }
@@ -151,13 +120,10 @@ export function parseLocalDevRequest(raw: unknown): LocalDevRequest {
   if (!isPackageName(packageName)) {
     throw new LocalDevError('invalid-request', 'Valid packageName is required')
   }
-  if (action === 'inspect' || action === 'reset-drift') {
+  if (action === 'inspect' || action === 'prepare-local') {
     return { action, packageName }
   }
-  if (action === 'set-self-mode' && (mode === 'baseline' || mode === 'local')) {
-    return { action, packageName, mode }
-  }
-  if (action === 'set-members-mode' && (mode === 'bundled' || mode === 'local')) {
+  if (action === 'switch' && (mode === 'npm' || mode === 'local')) {
     return { action, packageName, mode }
   }
   throw new LocalDevError('invalid-request', `Unsupported action or mode: ${JSON.stringify(action)}`)

@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { isScalar, parseDocument } from 'yaml'
 import { readCheckedBundle, resolveInstalledDependency } from '../lib/bundle-inspector.js'
-import { LocalDevStore } from '../lib/local-dev-store.js'
 import { LocalDevError } from '../lib/local-dev-types.js'
-import { buildLocalMembersOverlay } from '../lib/overlay-builder.js'
+import { allocateOverlayDir, buildLocalOverlay, gcOverlays, isManagedOverlayDir } from '../lib/overlay-builder.js'
 
 function writePlugin(dir: string, name: string, patchYaml: string, extraDeps: Record<string, string> = {}) {
   mkdirSync(dir, { recursive: true })
@@ -35,7 +34,6 @@ test('builds overlay with regenerated YAML AST patch and local member symlinks',
   mkdirSync(externalDep, { recursive: true })
   writeFileSync(join(externalDep, 'package.json'), JSON.stringify({ name: 'shared-helper', version: '1.0.0' }))
 
-  // Old installed member (stale id/config) vs updated local checkout with !!js tag.
   writePlugin(
     join(workspaceDir, 'member-a'),
     '@miorin/member-a',
@@ -79,13 +77,13 @@ test('builds overlay with regenerated YAML AST patch and local member symlinks',
   mkdirSync(join(installedDir, 'node_modules'), { recursive: true })
   symlinkSync(externalDep, join(installedDir, 'node_modules', 'shared-helper'), 'junction')
 
-  const store = new LocalDevStore(profileDir)
   const baseBundle = await readCheckedBundle(installedDir, '@miorin/dsh-atlas-demo')
-  const built = await buildLocalMembersOverlay({ store, profileDir, baseBundle, workspaceDir })
+  const built = await buildLocalOverlay({ profileDir, baseBundle, workspaceDir })
 
   assert.equal(await resolveInstalledDependency(built.overlayDir, '@miorin/member-a'), join(workspaceDir, 'member-a'))
   assert.equal(await resolveInstalledDependency(built.overlayDir, '@miorin/member-b'), join(workspaceDir, 'member-b'))
   assert.equal(await resolveInstalledDependency(built.overlayDir, 'shared-helper'), externalDep)
+  assert.equal(await isManagedOverlayDir(profileDir, '@miorin/dsh-atlas-demo', built.overlayDir), true)
 
   const patchDoc = parseDocument(readFileSync(join(built.overlayDir, 'cordis.patch.yml'), 'utf8'))
   assert.deepEqual(patchDoc.errors, [])
@@ -125,16 +123,15 @@ test('rejects missing member checkout and volatile profile-owned non-member depe
   mkdirSync(join(installedDir, 'node_modules'), { recursive: true })
   symlinkSync(profileOwnedDep, join(installedDir, 'node_modules', 'volatile-dep'), 'junction')
 
-  const store = new LocalDevStore(profileDir)
   const baseBundle = await readCheckedBundle(installedDir, '@miorin/agg')
   await assert.rejects(
-    () => buildLocalMembersOverlay({ store, profileDir, baseBundle, workspaceDir }),
+    () => buildLocalOverlay({ profileDir, baseBundle, workspaceDir }),
     (err: unknown) => err instanceof LocalDevError && err.code === 'missing-checkout',
   )
 
   writePlugin(join(workspaceDir, 'missing-b'), '@miorin/missing-b', '- insert:\n    - id: missing-b\n      name: "@miorin/missing-b"\n')
   await assert.rejects(
-    () => buildLocalMembersOverlay({ store, profileDir, baseBundle, workspaceDir }),
+    () => buildLocalOverlay({ profileDir, baseBundle, workspaceDir }),
     (err: unknown) => err instanceof LocalDevError && err.code === 'overlay-failed' && /prune/i.test(err.message),
   )
 })
@@ -149,13 +146,11 @@ test('applies dsh.aggregate.defaults when regenerating local-dev overlay patch',
   mkdirSync(profileDir, { recursive: true })
   mkdirSync(installedDir, { recursive: true })
 
-  // Local member-a has disabled: true in its own patch, but aggregate default is true (should strip).
   writePlugin(
     join(workspaceDir, 'member-a'),
     '@miorin/member-a',
     `- insert:\n    - id: member-a\n      name: '@miorin/member-a'\n      disabled: true\n`,
   )
-  // Local member-b has no disabled key, but aggregate default is false (should add disabled: true).
   writePlugin(
     join(workspaceDir, 'member-b'),
     '@miorin/member-b',
@@ -186,9 +181,8 @@ test('applies dsh.aggregate.defaults when regenerating local-dev overlay patch',
     },
   }, null, 2)}\n`)
 
-  const store = new LocalDevStore(profileDir)
   const baseBundle = await readCheckedBundle(installedDir, '@miorin/dsh-atlas-demo')
-  const built = await buildLocalMembersOverlay({ store, profileDir, baseBundle, workspaceDir })
+  const built = await buildLocalOverlay({ profileDir, baseBundle, workspaceDir })
 
   const patchDoc = parseDocument(readFileSync(join(built.overlayDir, 'cordis.patch.yml'), 'utf8'))
   assert.deepEqual(patchDoc.errors, [])
@@ -199,4 +193,27 @@ test('applies dsh.aggregate.defaults when regenerating local-dev overlay patch',
   assert.equal(rows[1].get('disabled'), true)
   assert.equal(rows[2].get('id'), 'dsh-atlas-demo')
   assert.equal(rows[2].has('disabled'), false)
+})
+
+test('allocates, identifies, and garbage-collects managed overlay directories', async t => {
+  const profileDir = realpathSync(mkdtempSync(join(tmpdir(), 'atlas-overlay-gc-')))
+  t.after(() => rmSync(profileDir, { recursive: true, force: true }))
+
+  const pkg = '@miorin/dsh-atlas-list'
+  const overlayA = await allocateOverlayDir(profileDir, pkg)
+  const overlayB = await allocateOverlayDir(profileDir, pkg)
+  assert.equal(existsSync(overlayA), true)
+  assert.equal(existsSync(overlayB), true)
+  assert.equal(await isManagedOverlayDir(profileDir, pkg, overlayA), true)
+  assert.equal(await isManagedOverlayDir(profileDir, pkg, overlayB), true)
+  assert.equal(await isManagedOverlayDir(profileDir, pkg, join(overlayB, '..')), false)
+  assert.equal(await isManagedOverlayDir(profileDir, pkg, join(profileDir, 'other')), false)
+
+  await gcOverlays(profileDir, pkg, overlayB)
+  assert.equal(existsSync(overlayA), false)
+  assert.equal(existsSync(overlayB), true)
+
+  await gcOverlays(profileDir, pkg, undefined)
+  assert.equal(existsSync(overlayB), false)
+  assert.equal(existsSync(join(overlayB, '..')), false)
 })

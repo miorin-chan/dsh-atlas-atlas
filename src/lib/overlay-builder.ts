@@ -1,5 +1,5 @@
-import { copyFile, lstat, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, sep } from 'node:path'
+import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { Document, isMap, isScalar, isSeq, parseDocument, YAMLMap } from 'yaml'
 import {
   inspectSiblingCheckout,
@@ -8,15 +8,79 @@ import {
   resolveInstalledDependency,
   type CheckedBundle,
 } from './bundle-inspector.js'
-import type { LocalDevStore } from './local-dev-store.js'
 import { isPackageName, LocalDevError } from './local-dev-types.js'
 
 const EXCLUDED_ENTRIES = new Set(['node_modules', '.git', '.cordis'])
+const OVERLAYS_SUBPATH = join('dsh-atlas-local-dev', 'overlays')
+
+function isMissing(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+}
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined
+}
+
+export function safePackageKey(packageName: string): string {
+  if (!isPackageName(packageName)) {
+    throw new LocalDevError('invalid-request', `Invalid package name: ${packageName}`)
+  }
+  return packageName.startsWith('@')
+    ? packageName.slice(1).replace('/', '__')
+    : packageName
+}
+
+function packageOverlaysDir(profileDir: string, packageName: string): string {
+  return join(profileDir, OVERLAYS_SUBPATH, safePackageKey(packageName))
+}
+
+export async function allocateOverlayDir(profileDir: string, packageName: string): Promise<string> {
+  const packageDir = packageOverlaysDir(profileDir, packageName)
+  await mkdir(packageDir, { recursive: true, mode: 0o700 })
+  const created = await mkdtemp(join(packageDir, 'overlay-'))
+  return realpath(created)
+}
+
+export async function gcOverlays(profileDir: string, packageName: string, keepDir?: string): Promise<void> {
+  const packageDir = packageOverlaysDir(profileDir, packageName)
+  const resolvedKeep = keepDir === undefined
+    ? undefined
+    : await realpath(keepDir).catch(() => keepDir)
+  let entries
+  try {
+    entries = await readdir(packageDir, { withFileTypes: true })
+  } catch (error) {
+    if (isMissing(error)) return
+    throw error
+  }
+  for (const entry of entries) {
+    const fullPath = join(packageDir, entry.name)
+    const resolvedEntry = await realpath(fullPath).catch(() => fullPath)
+    if (resolvedKeep !== undefined && resolvedEntry === resolvedKeep) continue
+    await rm(fullPath, { recursive: true, force: true })
+  }
+  if (resolvedKeep === undefined) {
+    const remaining = await readdir(packageDir).catch(() => [])
+    if (remaining.length === 0) {
+      await rm(packageDir, { recursive: true, force: true })
+    }
+  }
+}
+
+export async function isManagedOverlayDir(
+  profileDir: string,
+  packageName: string,
+  candidateDir: string,
+): Promise<boolean> {
+  const realProfileDir = await realpath(profileDir).catch(() => resolve(profileDir))
+  const packageDir = packageOverlaysDir(realProfileDir, packageName)
+  const [realPackageDir, realCandidate] = await Promise.all([
+    realpath(packageDir).catch(() => packageDir),
+    realpath(candidateDir).catch(() => resolve(candidateDir)),
+  ])
+  return realCandidate !== realPackageDir && isInside(realPackageDir, realCandidate)
 }
 
 function packageNameOf(specifier: unknown): string | undefined {
@@ -114,16 +178,15 @@ export interface BuiltOverlay {
   readonly memberPaths: Readonly<Record<string, string>>
 }
 
-export async function buildLocalMembersOverlay(options: {
-  readonly store: LocalDevStore
+export async function buildLocalOverlay(options: {
   readonly profileDir: string
   readonly baseBundle: CheckedBundle
   readonly workspaceDir: string
 }): Promise<BuiltOverlay> {
-  const { store, baseBundle, workspaceDir } = options
+  const { baseBundle, workspaceDir } = options
   const aggregate = baseBundle.aggregate
   if (!aggregate) {
-    throw new LocalDevError('not-aggregate', `${baseBundle.name} declares no dsh.aggregate.plugins`)
+    throw new LocalDevError('overlay-failed', `${baseBundle.name} declares no dsh.aggregate.plugins`)
   }
   const realProfileDir = await realpath(options.profileDir)
 
@@ -211,7 +274,7 @@ export async function buildLocalMembersOverlay(options: {
     nonMemberLinks.push({ name: dep, root: resolved })
   }
 
-  const overlayDir = await store.allocateOverlayDir(baseBundle.name)
+  const overlayDir = await allocateOverlayDir(realProfileDir, baseBundle.name)
   try {
     await copyPackageFiles(baseBundle.root, overlayDir)
     const primaryPatchRel = baseBundle.patchRelativePaths[0]

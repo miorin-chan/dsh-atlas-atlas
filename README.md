@@ -5,7 +5,7 @@
 Manage the workspace, session, list, plugin, mobile, continuity,
 and visual bundles—and any other installed `dsh.aggregate` bundles—from one page.
 In DeepSeek Harness Web or Desktop, open **Plugins → Add plugin** and enter `@miorin/dsh-atlas-atlas`.
-Open **Plugins → Atlas Modular Improvement Plan** to toggle bundles or manage local development links.
+Open **Plugins → Atlas Modular Improvement Plan** to toggle bundles or switch between npm and local repositories.
 
 The manager requires DSH `0.2.2-rc.5` or newer.
 DSH checks each member bundle's version requirements when it installs.
@@ -13,19 +13,17 @@ When you turn on a bundle, the manager reuses the existing installation (includi
 or overlay) without overwriting its source.
 By default, all seven Atlas bundles install from npm; when **Enable local repository links** is turned
 on with a saved workspace directory, turning on any uninstalled bundle installs directly
-from `link:<workspace>/dsh-atlas-<atlas>` instead of falling back to npm.
+from your local workspace (synthesizing a profile-private overlay with local sub-plugins
+for aggregate bundles) instead of falling back to npm.
 Disable standalone VCS Panel and Sideby Note bundles before enabling Continuity, and disable standalone visual plugins
 (or an older List Atlas that still includes Peak pricing timeline) before enabling Visual.
 Turning a bundle off keeps the installed copy and its plugin settings.
 
 For local development, turn on **Enable local repository links**
 and save the absolute directory containing your sibling plugin checkouts (for example `/work/plugins`).
-When enabled, two orthogonal controls appear in this panel and at the bottom of plugin detail pages:
-
-- **Package source**: switches any manageable single plugin or aggregate bundle itself between its baseline source
-  and `<workspace>/<basename>`.
-- **Aggregate members**: switches all direct member plugins declared
-  in an aggregate's `dsh.aggregate` metadata between bundled dependencies and `<workspace>/<member>`,
-  using profile-private overlays without modifying your source tree.
+When enabled, a **Package source** control appears in this panel and at the bottom of manageable plugin detail pages
+to switch between **npm** (latest registry release) and **Local repository** (`<workspace>/<basename>`;
+for aggregate bundles, also linking all declared `<workspace>/<member>` checkouts through a profile-private overlay
+without modifying your source tree).
 
 [Development and verification](docs/README.md)
