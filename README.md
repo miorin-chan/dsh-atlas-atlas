@@ -24,10 +24,11 @@ in a developer profile.
 
 ## Screenshots
 
-The **Atlas Modular Improvement Plan** shows the **Mobile Modular Improvement Plan** expanded, with two member switches.
+The **Atlas Modular Improvement Plan** lists all seven bundles in canonical order with four enabled
+and **Workspace Modular Improvement Plan** expanded to show its four member switches.
 The screenshots show the Chinese UI.
 
-![Mobile Modular Improvement Plan expanded to show two member switches](docs/assets/screenshots/main-light.png)
+![Atlas Modular Improvement Plan with Workspace Modular Improvement Plan expanded to show four member switches](docs/assets/screenshots/main-light.png)
 
 [Main view in dark mode](docs/assets/screenshots/main-dark.png)
 

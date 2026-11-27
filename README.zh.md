@@ -20,9 +20,10 @@ DSH 在首次开启尚未安装的成员包时会从 npm 公共 registry 安装�
 
 ## 实拍截图
 
-「模块模块化改良计划」中展开了「移动端模块化改良计划」，显示两个成员插件的开关。
+「模块模块化改良计划」按规范顺序展示七个主题包，其中四个已启用，
+并展开了「工作区模块化改良计划」以显示其四个成员插件的开关。
 
-![移动端模块化改良计划展开后显示两个成员插件的开关](docs/assets/screenshots/main-light.png)
+![模块模块化改良计划展开工作区模块化改良计划后显示四个成员插件的开关](docs/assets/screenshots/main-light.png)
 
 [深色模式主图](docs/assets/screenshots/main-dark.png)
 
