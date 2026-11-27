@@ -271,7 +271,7 @@ test('renders seven Atlas switches and discovered aggregates without local-dev i
     assert.deepEqual(fetchUrls, ['/api/dsh-atlas-aggregates'])
     const bundlesList = view!.root.findByProps({ 'data-atlas-panel': 'bundles' })
     const switches = bundlesList.findAllByProps({ role: 'switch' })
-    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'plugin', 'mobile', 'continuity', 'visual'])
+    assert.deepEqual(switches.flatMap(item => item.props['aria-label'] ?? []), ['workspace', 'session', 'list', 'continuity', 'visual', 'plugin', 'mobile'])
     assert.equal(switches.find(item => item.props['aria-label'] === 'continuity')?.props.disabled, false)
     assert.equal(switches.find(item => item.props['aria-label'] === 'visual')?.props.disabled, false)
 

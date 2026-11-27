@@ -13,10 +13,10 @@ export const ATLAS_BUNDLES = {
   workspace: '@miorin/dsh-atlas-workspace',
   session: '@miorin/dsh-atlas-session',
   list: '@miorin/dsh-atlas-list',
-  plugin: '@miorin/dsh-atlas-plugin',
-  mobile: '@miorin/dsh-atlas-mobile',
   continuity: '@miorin/dsh-atlas-continuity',
   visual: '@miorin/dsh-atlas-visual',
+  plugin: '@miorin/dsh-atlas-plugin',
+  mobile: '@miorin/dsh-atlas-mobile',
 } as const
 
 export type Atlas = keyof typeof ATLAS_BUNDLES

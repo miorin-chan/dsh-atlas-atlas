@@ -11,8 +11,8 @@
 
 ## 行为
 
-管理卡本身不依赖第三方运行时 npm 包，通过 `plugins.bundle.config` 插槽按工作区、会话、列表、插件、移动端、
-脉络、外观的顺序渲染七个开关，同时提供零依赖只读 Host 路由 `GET /api/dsh-atlas-aggregates`（浏览器会话鉴权），
+管理卡本身不依赖第三方运行时 npm 包，通过 `plugins.bundle.config` 插槽按工作区、会话、列表、脉络、外观、插件、
+移动端的顺序渲染七个开关，同时提供零依赖只读 Host 路由 `GET /api/dsh-atlas-aggregates`（浏览器会话鉴权），
 从已安装 profile 包的 `package.json` 读取 `dsh.aggregate` 声明以发现包括未启用聚合包在内的第三方聚合包。
 管理卡从 `pluginManager.listBundles` 获取当前 profile 的整包状态，
 并在收到 `plugin-manager/changed` 或连接恢复后同步刷新。

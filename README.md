@@ -2,8 +2,8 @@
 
 [简体中文](README.zh.md)
 
-Manage the workspace, session, list, plugin, mobile, continuity,
-and visual bundles—and any other installed `dsh.aggregate` bundles—from one page.
+Manage the workspace, session, list, continuity, visual, plugin,
+and mobile bundles—and any other installed `dsh.aggregate` bundles—from one page.
 In DeepSeek Harness Web or Desktop, open **Plugins → Add plugin** and enter `@miorin/dsh-atlas-atlas`.
 Open **Plugins → Atlas Modular Improvement Plan** to toggle bundles or expand sub-plugin settings inline.
 
