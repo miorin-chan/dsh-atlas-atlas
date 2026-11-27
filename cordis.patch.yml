@@ -1,4 +1,7 @@
 # The Host discovers installed dsh.aggregate bundles. The Client renders the Atlas manager.
+# The companion row mounts the profile controller in native Settings.
 - insert:
     - id: dsh-atlas-atlas
       name: '@miorin/dsh-atlas-atlas'
+    - id: dsh-atlas-profile
+      name: '@miorin/dsh-atlas-profile'

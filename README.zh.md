@@ -2,9 +2,12 @@
 
 [English](README.md)
 
-在 DeepSeek Harness 的 **插件 → 添加插件** 中输入 `@miorin/dsh-atlas-atlas`，再打开 **插件 → 模块模块化改良计划**。
+在 DeepSeek Harness 的 **插件 → 添加插件** 中输入 `@miorin/dsh-atlas-atlas`，
+安装后即可在原生 **设置 → 模块化改良计划** 中选择四套体验方案或开关常用能力，
+也可以打开 **插件 → 模块模块化改良计划** 逐包管理。
 七个开关分别管理当前 profile 的工作区、会话、列表、脉络、外观、插件和移动端模块化改良计划，
-并自动发现 profile 中其他声明了 `dsh.aggregate` 契约的聚合包，在唯一列表内原位展开各子插件的开关与设置。
+并自动发现 profile 中其他声明了 `dsh.aggregate` 契约的聚合包，在唯一列表内原位展开各子插件的开关与设置；
+如无需原生设置页签，可在详情页底部单独关闭 **配置模块化改良计划** 这一行。
 
 管理器需要 DeepSeek Harness `0.2.2-rc.5` 或更新版本的 Web 或桌面界面。
 DSH 在首次开启尚未安装的成员包时会从 npm 公共 registry 安装并核对其版本要求。

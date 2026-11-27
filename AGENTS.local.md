@@ -7,10 +7,11 @@ Where the two conflict, this file wins.
 
 ## Scope
 
-This bundle provides the lightweight user-facing Atlas manager card.
+This bundle provides the lightweight user-facing Atlas manager card together
+with the companion `@miorin/dsh-atlas-profile` sub-plugin (`plugins/dsh-atlas-profile`) for native Settings.
 Local repository linking, overlay synthesis, and detail-page source switching live
 in the separate developer plugin `@miorin/dsh-atlas-dev` (`plugins/dsh-atlas-dev`)
-so `@miorin/dsh-atlas-atlas` stays free of runtime dependencies.
+so `@miorin/dsh-atlas-atlas` stays free of third-party runtime dependencies.
 
 ## Project documentation
 
@@ -67,7 +68,8 @@ Node.js 22.18 or newer runs the `.test.mts` files directly.
 
 ## Implementation
 
-- Keep the bundle independently installable and toggleable, with zero runtime `dependencies`.
+- Keep the bundle independently installable and toggleable,
+  with zero third-party runtime `dependencies` (only companion `@miorin/dsh-atlas-profile`).
 - Implement the feature through supported DSH plugin APIs and extension points.
   Keep DSH source and installed files intact.
 - Reuse the DSH type declarations for the supported runtime version.

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -291,4 +291,15 @@ test('discovers installed enabled and disabled dsh.aggregate bundles from profil
     { packageName: '@local/custom-bundle', memberCount: 2 },
     { packageName: '@third/reg-agg', memberCount: 3 },
   ])
+})
+
+test('bundles companion @miorin/dsh-atlas-profile in cordis.patch.yml without adding third-party runtime deps', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    dependencies?: Record<string, string>
+  }
+  const patch = readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+  assert.deepEqual(Object.keys(pkg.dependencies ?? {}), ['@miorin/dsh-atlas-profile'])
+  assert.match(patch, /- id:\s*dsh-atlas-atlas\b/)
+  assert.match(patch, /- id:\s*dsh-atlas-profile\b/)
+  assert.match(patch, /name:\s*['"]@miorin\/dsh-atlas-profile['"]/)
 })

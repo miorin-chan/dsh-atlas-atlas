@@ -5,7 +5,10 @@
 Manage the workspace, session, list, continuity, visual, plugin,
 and mobile bundles—and any other installed `dsh.aggregate` bundles—from one page.
 In DeepSeek Harness Web or Desktop, open **Plugins → Add plugin** and enter `@miorin/dsh-atlas-atlas`.
-Open **Plugins → Atlas Modular Improvement Plan** to toggle bundles or expand sub-plugin settings inline.
+Once installed, choose an experience profile or high-level preferences directly in **Settings → Atlas**,
+or open **Plugins → Atlas Modular Improvement Plan** to toggle bundles and expand sub-plugin settings inline.
+If you prefer not to add a tab to native Settings,
+you can turn off the companion **Profile Modular Improvement Plan** row on the bundle detail page.
 
 The manager requires DSH `0.2.2-rc.5` or newer.
 DSH checks each member bundle's version requirements when it installs missing bundles from npm.

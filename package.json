@@ -86,6 +86,9 @@
     "react-test-renderer": "18.3.1",
     "typescript": "5.7.3"
   },
+  "dependencies": {
+    "@miorin/dsh-atlas-profile": "link:../dsh-atlas-profile"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/miorin-chan/dsh-atlas-atlas.git"

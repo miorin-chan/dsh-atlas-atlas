@@ -915,7 +915,7 @@ test('navigates to bundle detail pages and confirms uninstall with native Modal'
       dependencies?: Record<string, string>
       scripts?: Record<string, string>
     }
-    assert.equal(pkgJson.dependencies, undefined)
+    assert.deepEqual(Object.keys(pkgJson.dependencies ?? {}), ['@miorin/dsh-atlas-profile'])
     assert.equal(pkgJson.scripts?.prepack, 'npm run build 1>&2')
     assert.match(pkgJson.scripts?.['sync:atlas-icons'] ?? '', /scripts\/build\.mjs/)
   } finally {

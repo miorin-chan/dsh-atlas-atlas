@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@miorin/dsh-atlas-profile':
+        specifier: link:../dsh-atlas-profile
+        version: link:../dsh-atlas-profile
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.1.0
